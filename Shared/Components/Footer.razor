@@ -1,0 +1,51 @@
+@namespace FootballerWeb.Shared.Components
+
+<!-- Footer Global Component -->
+<footer style="background: #2c3e50; color: white; padding: 3rem 2rem 2rem 2rem; width: 100%; margin-top: auto;">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-6">
+                <h5 style="color: #3498db; margin-bottom: 1rem;">Footballer Web App</h5>
+                <p style="color: #bdc3c7;">
+                    Plataforma de gestión de torneos de fútbol desarrollada por Alex Rico.
+                </p>
+            </div>
+            <div class="col-md-3">
+                <h6 style="color: #3498db; margin-bottom: 1rem;">Enlaces Útiles</h6>
+                <ul class="list-unstyled">
+                    <li><a href="/" class="text-decoration-none" style="color: #bdc3c7;">Inicio</a></li>
+                    <li><a href="/torneo" class="text-decoration-none" style="color: #bdc3c7;">Torneos</a></li>
+                    <li><a href="/about" class="text-decoration-none" style="color: #bdc3c7;">Acerca de</a></li>
+                    <li><a href="/contact" class="text-decoration-none" style="color: #bdc3c7;">Contacto</a></li>
+                </ul>
+            </div>
+            <div class="col-md-3">
+                <h6 style="color: #3498db; margin-bottom: 1rem;">Soporte</h6>
+                <ul class="list-unstyled">
+                    <li><a href="#" class="text-decoration-none" style="color: #bdc3c7;">Ayuda</a></li>
+                    <li><a href="#" class="text-decoration-none" style="color: #bdc3c7;">Documentación</a></li>
+                    <li><a href="#" class="text-decoration-none" style="color: #bdc3c7;">Términos de Uso</a></li>
+                    <li><a href="#" class="text-decoration-none" style="color: #bdc3c7;">Privacidad</a></li>
+                </ul>
+            </div>
+        </div>
+        <hr class="my-4">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <p class="mb-0" style="color: #bdc3c7;">
+                    &copy; @DateTime.Now.Year FootballerWeb. Todos los derechos reservados.
+                </p>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <p class="mb-0" style="color: #bdc3c7;">
+                    Desarrollado por Alex Rico
+                </p>
+            </div>
+        </div>
+    </div>
+</footer>
+
+@code {
+    // Aquí puedes agregar lógica del componente si es necesario
+    // Por ejemplo, parámetros para personalizar el footer
+}

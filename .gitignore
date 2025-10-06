@@ -1,0 +1,160 @@
+# .NET Core
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio
+.vs/
+*.vscode/
+*.sln.ide/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Files built by Visual Studio
+*_i.c
+*_p.c
+*_h.h
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.pch
+*.pdb
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# NuGet
+packages/
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# StyleCop
+StyleCopReport.xml
+
+# Microsoft Azure Build Output
+csx/
+*.build.csdef
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Mac
+.DS_Store
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# CodeRush personal settings
+.cr/personal
+
+# Python tools for Visual Studio (PTVS)
+__pycache__/
+*.pyc
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+log-*.txt
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Application settings (keep development template)
+appsettings.Development.json
+appsettings.Production.json
+
+# Runtime files
+*.exe
+*.dll
+*.pdb
+*.cache
+*.tmp
+
+# Publish profiles
+PublishProfiles/
+Properties/PublishProfiles/
+
+# Web.config (auto-generated)
+Web.config
+web.config
+
+# Blazor specific
+wwwroot/dist/
+wwwroot/css/site.css.map
+wwwroot/js/site.js.map
+
+# Node modules (if using npm for frontend tools)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+*.msix
+
+# Windows shortcuts
+*.lnk
+
+# Temporary files
+*.swp
+*.swo
+*~

@@ -1,0 +1,97 @@
+@using FootballerWeb.Services
+@inject IAuthService AuthService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject ILogger<LogoutButton> Logger
+
+<button class="@CssClass" @onclick="HandleLogout" disabled="@isLoggingOut">
+    @if (isLoggingOut)
+    {
+        <div class="spinner-border spinner-border-sm me-2" role="status">
+            <span class="visually-hidden">Cerrando sesión...</span>
+        </div>
+        <text>Cerrando sesión...</text>
+    }
+    else
+    {
+        <i class="oi oi-account-logout me-2"></i>
+        <text>@ButtonText</text>
+    }
+</button>
+
+@code {
+    [Parameter] public string ButtonText { get; set; } = "Cerrar Sesión";
+    [Parameter] public string CssClass { get; set; } = "btn btn-outline-light";
+    [Parameter] public bool ShowConfirmation { get; set; } = true;
+    [Parameter] public string ConfirmationMessage { get; set; } = "¿Estás seguro de que deseas cerrar sesión?";
+    [Parameter] public EventCallback OnLogoutCompleted { get; set; }
+    
+    private bool isLoggingOut = false;
+
+    private async Task HandleLogout()
+    {
+        if (isLoggingOut) return;
+
+        try
+        {
+            // Show confirmation if enabled
+            if (ShowConfirmation)
+            {
+                var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", ConfirmationMessage);
+                if (!confirmed) return;
+            }
+
+            isLoggingOut = true;
+            StateHasChanged();
+
+            // Call AuthService logout
+            var logoutSuccess = await AuthService.LogoutAsync();
+
+            // Clear localStorage
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "jwt_token");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "user_name");
+
+            Logger.LogInformation("User logout completed. API Success: {Success}", logoutSuccess);
+
+            // Fire completion event
+            await OnLogoutCompleted.InvokeAsync();
+
+            // Show appropriate message
+            if (logoutSuccess)
+            {
+                await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "logout_message", "Sesión cerrada exitosamente.");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "logout_message", "Sesión cerrada localmente. Verificar conectividad con el servidor.");
+            }
+
+            // Redirect to login
+            Navigation.NavigateTo("/auth/simple-login", true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during logout process");
+
+            // Force cleanup
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "jwt_token");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "user_name");
+                AuthService.ClearUserToken();
+            }
+            catch (Exception cleanupEx)
+            {
+                Logger.LogError(cleanupEx, "Error during logout cleanup");
+            }
+
+            await JSRuntime.InvokeVoidAsync("alert", "Error al cerrar sesión. Sesión limpiada localmente.");
+            Navigation.NavigateTo("/auth/simple-login", true);
+        }
+        finally
+        {
+            isLoggingOut = false;
+            StateHasChanged();
+        }
+    }
+}

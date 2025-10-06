@@ -1,0 +1,120 @@
+@page "/auth/simple-login"
+@using FootballerWeb.Services
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject IAuthService AuthService
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <h2>Autenticación con Google</h2>
+            <p>Inicia sesión para acceder al área de miembros</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(logoutMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="oi oi-check"></i> @logoutMessage
+            </div>
+        }
+
+        @if (isLoading)
+        {
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="mt-2">Redirigiendo a Google...</p>
+            </div>
+        }
+        else
+        {
+            <div class="d-grid">
+                <button class="btn btn-primary btn-lg" @onclick="LoginWithGoogle">
+                    <i class="bi bi-google"></i> Continuar con Google
+                </button>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-3">
+                @errorMessage
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .login-card {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        max-width: 400px;
+        width: 100%;
+    }
+</style>
+
+@code {
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+    private string logoutMessage = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Check for logout message
+            try
+            {
+                var message = await JSRuntime.InvokeAsync<string?>("sessionStorage.getItem", "logout_message");
+                if (!string.IsNullOrEmpty(message))
+                {
+                    logoutMessage = message;
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "logout_message");
+                    StateHasChanged();
+                    
+                    // Clear the message after 5 seconds
+                    await Task.Delay(5000);
+                    logoutMessage = string.Empty;
+                    StateHasChanged();
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore errors getting logout message
+            }
+        }
+    }
+
+    private void LoginWithGoogle()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+
+            // Redirect directly to the API's OAuth endpoint
+            var authUrl = "https://localhost:8090/auth/login";
+            
+            // Open in the same window to maintain session
+            Navigation.NavigateTo(authUrl, forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Error iniciando autenticación: " + ex.Message;
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

@@ -1,0 +1,164 @@
+@using FootballerWeb.Services
+@using Microsoft.AspNetCore.Components
+@inject IJSRuntime JSRuntime
+@inject IAuthService AuthService
+@inject IJwtClientService JwtClientService
+@inject NavigationManager Navigation
+@inject ILogger<AuthGuard> Logger
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 50vh;">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Verificando autenticación...</span>
+            </div>
+            <p class="mt-3 text-muted">Verificando autenticación...</p>
+        </div>
+    </div>
+}
+else if (isAuthenticated)
+{
+    @ChildContent
+}
+else
+{
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="card shadow-lg border-0">
+                    <div class="card-body p-5 text-center">
+                        <div class="mb-4">
+                            <i class="oi oi-lock-locked text-warning" style="font-size: 4rem;"></i>
+                        </div>
+                        <h3 class="card-title text-primary mb-4">🔒 Acceso Restringido</h3>
+                        <p class="card-text text-muted mb-4">
+                            Esta página requiere autenticación. Por favor, inicia sesión para continuar.
+                        </p>
+                        
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-warning mb-4">
+                                <i class="oi oi-warning"></i> @errorMessage
+                            </div>
+                        }
+                        
+                        <div class="d-grid gap-2">
+                            <a href="/auth/simple-login" class="btn btn-primary btn-lg">
+                                <i class="oi oi-account-login"></i> Iniciar Sesión con Google
+                            </a>
+                            <a href="/" class="btn btn-outline-secondary">
+                                <i class="oi oi-home"></i> Volver al Inicio
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    
+    private bool isLoading = true;
+    private bool isAuthenticated = false;
+    private string errorMessage = string.Empty;
+    private bool hasRendered = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !hasRendered)
+        {
+            hasRendered = true;
+            await CheckAuthenticationAsync();
+        }
+    }
+
+    private async Task CheckAuthenticationAsync()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = string.Empty;
+            StateHasChanged();
+            
+            // Small delay to ensure JS is ready
+            await Task.Delay(100);
+            
+            // Check for JWT token in localStorage
+            var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "jwt_token");
+            
+            if (!string.IsNullOrEmpty(token))
+            {
+                // Validate token locally
+                if (JwtClientService.IsTokenValid(token))
+                {
+                    // Set the token in AuthService
+                    AuthService.SetUserToken(token);
+                    isAuthenticated = true;
+                }
+                else
+                {
+                    // Token is invalid, clear it
+                    await ClearInvalidTokenAsync();
+                    isAuthenticated = false;
+                }
+            }
+            else
+            {
+                isAuthenticated = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error checking authentication");
+            errorMessage = "Error al verificar la sesión. Por favor, intenta nuevamente.";
+            isAuthenticated = false;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearInvalidTokenAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "jwt_token");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "user_name");
+            AuthService.ClearUserToken();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Error clearing invalid tokens");
+        }
+    }
+}
+
+<style>
+    .card {
+        border-radius: 15px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+    }
+    
+    .card-body {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 15px;
+    }
+    
+    .btn-lg {
+        padding: 12px 30px;
+        font-weight: 600;
+        border-radius: 25px;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-lg:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+</style>

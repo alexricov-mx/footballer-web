@@ -1,0 +1,103 @@
+@page "/about"
+
+<div style="min-height: 100vh; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 2rem;">
+    <!-- Header con Logo -->
+    <div class="text-center mb-5" style="background: white; border-radius: 15px; padding: 3rem 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+        <div class="logo-placeholder">
+            <img src="/images/logo.png" alt="FootballerWeb Logo" style="max-width: 150px; height: auto; border-radius: 50%;" />
+            <!-- Si no tienes logo, puedes usar este placeholder -->
+            <div style="display: inline-block; padding: 2rem; background: #f8f9fa; border-radius: 50%; margin-bottom: 1rem;">
+                <i class="oi oi-globe" style="font-size: 4rem; color: #0d6efd;"></i>
+            </div>
+        </div>
+        <h1 class="mt-3" style="color: #2c3e50;">Footballer Web App</h1>
+        <p class="lead">Tu aplicación de gestión de torneos de fútbol</p>
+    </div>
+
+    <!-- Información Técnica -->
+    <div class="mb-5" style="background: white; border-radius: 15px; padding: 2rem; box-shadow: 0 5px 15px rgba(0,0,0,0.08);">
+        <h2 style="color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 0.5rem; margin-bottom: 2rem; display: inline-block;">Información Técnica</h2>
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="background-color: #34495e !important; color: white; font-weight: 600;">Componente</th>
+                        <th style="background-color: #34495e !important; color: white; font-weight: 600;">Versión/Información</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Versión de la Aplicación</strong></td>
+                        <td>1.0.0</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Framework</strong></td>
+                        <td>Blazor Server (.NET 10.0)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Última Actualización</strong></td>
+                        <td>Octubre 2025</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Estado del Sistema</strong></td>
+                        <td><span class="badge bg-success" style="font-size: 0.9em;">Operativo</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Sobre la Aplicación -->
+    <div class="mb-5" style="background: white; border-radius: 15px; padding: 2rem; box-shadow: 0 5px 15px rgba(0,0,0,0.08);">
+        <h2 style="color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 0.5rem; margin-bottom: 2rem; display: inline-block;">Acerca de FootballerWeb</h2>
+        <div class="row">
+            <div class="col-md-8">
+                <p>
+                    Footballer Web App es una aplicación moderna desarrollada con Blazor Server y .NET 10, 
+                    diseñada para la gestión de torneos de fútbol con un sistema robusto de autenticación JWT 
+                    y integración con Google OAuth 2.0.
+                </p>
+                <p>
+                    La aplicación cuenta con una arquitectura limpia que separa la API de autenticación 
+                    del cliente web, garantizando seguridad y escalabilidad.
+                </p>
+            </div>
+            <div class="col-md-4">
+                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; border-left: 4px solid #3498db;">
+                    <h5 style="color: #3498db; margin-bottom: 1rem;">Características actuales:</h5>
+                    <ul class="list-unstyled">
+                        <li style="padding: 0.5rem 0; padding-left: 1.5rem;"><i class="oi oi-check text-success"></i> Autenticación Google OAuth 2.0</li>
+                        <li style="padding: 0.5rem 0; padding-left: 1.5rem;"><i class="oi oi-check text-success"></i> JWT Token Management</li>
+                        <li style="padding: 0.5rem 0; padding-left: 1.5rem;"><i class="oi oi-check text-success"></i> Dashboard protegido</li>
+                        <li style="padding: 0.5rem 0; padding-left: 1.5rem;"><i class="oi oi-check text-success"></i> Claims visualization</li>
+                        <li style="padding: 0.5rem 0; padding-left: 1.5rem;"><i class="oi oi-check text-success"></i> Logout seguro</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Arquitectura del Sistema -->
+    <div class="mb-5" style="background: white; border-radius: 15px; padding: 2rem; box-shadow: 0 5px 15px rgba(0,0,0,0.08);">
+        <h2 style="color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 0.5rem; margin-bottom: 2rem; display: inline-block;">Arquitectura del Sistema</h2>
+        <div class="row">
+            <div class="col-md-6">
+                <div style="background: #e8f5e8; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;">
+                    <h5 style="color: #27ae60;"><i class="oi oi-cloud-upload"></i> API Backend</h5>
+                    <p class="mb-0">Puerto: <code>8090</code><br>
+                    Función: OAuth Provider, JWT Generation, Session Management</p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div style="background: #e8f4fd; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;">
+                    <h5 style="color: #3498db;"><i class="oi oi-browser"></i> Web Client</h5>
+                    <p class="mb-0">Puerto: <code>7003</code><br>
+                    Función: Blazor Server UI, JWT Consumer, Protected Routes</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+

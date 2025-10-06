@@ -1,0 +1,405 @@
+@page "/members/dashboard"
+@using FootballerWeb.Services
+@using Microsoft.AspNetCore.Components
+@using FootballerWeb.Shared.Components
+@inject IJSRuntime JSRuntime
+@inject IAuthService AuthService
+@inject IJwtClientService JwtClientService
+@inject NavigationManager Navigation
+
+<AuthGuard>
+    <div class="members-container">
+        <div class="members-header">
+            <div class="container-fluid">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h1 class="members-title">
+                            <i class="oi oi-shield text-primary me-3"></i>
+                            Área de Miembros
+                        </h1>
+                        <p class="members-subtitle">Bienvenido @userName</p>
+                        <div class="user-status">
+                            <span class="badge bg-success">✅ Autenticado</span>
+                            <span class="text-muted ms-2">@userEmail</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <LogoutButton 
+                            ButtonText="Cerrar Sesión" 
+                            CssClass="btn btn-outline-light"
+                            ShowConfirmation="true" 
+                            ConfirmationMessage="¿Estás seguro de que deseas cerrar sesión?" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="members-content p-4">
+            <div class="container-fluid">
+                <!-- Stats Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-icon">
+                                    <i class="oi oi-trophy text-warning"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <h3>5</h3>
+                                    <p>Torneos</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-icon">
+                                    <i class="oi oi-people text-info"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <h3>12</h3>
+                                    <p>Equipos</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-icon">
+                                    <i class="oi oi-graph text-success"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <h3>89</h3>
+                                    <p>Partidos</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-icon">
+                                    <i class="oi oi-star text-danger"></i>
+                                </div>
+                                <div class="stat-info">
+                                    <h3>4.8</h3>
+                                    <p>Rating</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">🚀 Acciones Rápidas</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3 mb-2">
+                                        <a href="#" class="btn btn-primary w-100">
+                                            <i class="oi oi-plus"></i> Crear Torneo
+                                        </a>
+                                    </div>
+                                    <div class="col-md-3 mb-2">
+                                        <a href="#" class="btn btn-outline-primary w-100">
+                                            <i class="oi oi-people"></i> Gestionar Equipos
+                                        </a>
+                                    </div>
+                                    <div class="col-md-3 mb-2">
+                                        <a href="#" class="btn btn-outline-primary w-100">
+                                            <i class="oi oi-calendar"></i> Ver Calendario
+                                        </a>
+                                    </div>
+                                    <div class="col-md-3 mb-2">
+                                        <a href="#" class="btn btn-outline-primary w-100">
+                                            <i class="oi oi-bar-chart"></i> Estadísticas
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- JWT Token Info -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">🔒 Información de Sesión JWT</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <strong>Estado:</strong> 
+                                        <span class="badge bg-success ms-2">Autenticado con JWT</span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Válido hasta:</strong> 
+                                        <span class="text-muted">@tokenExpiration</span>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <strong>Emisor:</strong> <span class="text-muted">@tokenIssuer</span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Audiencia:</strong> <span class="text-muted">@tokenAudience</span>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <strong>Expira:</strong> <span class="text-muted">@tokenExpirationDate</span>
+                                    </div>
+                                </div>
+                                
+                                <hr>
+                                
+                                <h6 class="mb-3">📋 Claims del Token JWT</h6>
+                                @if (userClaims.Any())
+                                {
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th style="width: 30%">Claim</th>
+                                                    <th style="width: 70%">Valor</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var claim in userClaims.Take(10))
+                                                {
+                                                    <tr>
+                                                        <td>
+                                                            <span class="badge bg-light text-dark">@claim.Key</span>
+                                                        </td>
+                                                        <td>
+                                                            @if (claim.Key.Contains("picture") || claim.Key.Contains("Foto"))
+                                                            {
+                                                                <img src="@claim.Value" alt="Avatar" class="rounded-circle me-2" style="width: 32px; height: 32px;">
+                                                                <small class="text-muted">@claim.Value</small>
+                                                            }
+                                                            else if (claim.Key.Contains("email_verified") || claim.Key.Contains("Email Verificado"))
+                                                            {
+                                                                @if (claim.Value.ToLower() == "true")
+                                                                {
+                                                                    <span class="badge bg-success">✅ Verificado</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="badge bg-warning">⚠️ No verificado</span>
+                                                                }
+                                                            }
+                                                            else if (claim.Key.Contains("Expiración") || claim.Key.Contains("exp"))
+                                                            {
+                                                                <span class="text-info">@claim.Value</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <code class="text-primary">@claim.Value</code>
+                                                            }
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    @if (userClaims.Count > 10)
+                                    {
+                                        <div class="mt-2">
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleShowAllClaims">
+                                                @if (showAllClaims)
+                                                {
+                                                    <i class="oi oi-chevron-top"></i><text> Mostrar menos</text>
+                                                }
+                                                else
+                                                {
+                                                    <i class="oi oi-chevron-bottom"></i><text> Mostrar todos (@userClaims.Count claims)</text>
+                                                }
+                                            </button>
+                                        </div>
+                                        
+                                        @if (showAllClaims)
+                                        {
+                                            <div class="table-responsive mt-3">
+                                                <table class="table table-sm table-hover">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th style="width: 30%">Claim</th>
+                                                            <th style="width: 70%">Valor</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var claim in userClaims.Skip(10))
+                                                        {
+                                                            <tr>
+                                                                <td>
+                                                                    <span class="badge bg-light text-dark">@claim.Key</span>
+                                                                </td>
+                                                                <td>
+                                                                    <code class="text-primary">@claim.Value</code>
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="alert alert-info">
+                                        <i class="oi oi-info"></i> No se encontraron claims en el token.
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</AuthGuard>
+
+<style>
+    .members-container {
+        min-height: 100vh;
+        background: #f8f9fa;
+    }
+
+    .members-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 0;
+    }
+
+    .members-title {
+        font-size: 2.5rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .members-subtitle {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        margin-bottom: 1rem;
+    }
+
+    .user-status {
+        margin-top: 0.5rem;
+    }
+
+    .members-content {
+        padding: 2rem 0;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        height: 100%;
+        transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-content {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .stat-icon {
+        font-size: 2rem;
+    }
+
+    .stat-info h3 {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0;
+        color: #2c3e50;
+    }
+
+    .stat-info p {
+        margin-bottom: 0;
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .card {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .card-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        border-radius: 15px 15px 0 0 !important;
+    }
+</style>
+
+@code {
+    private string userName = string.Empty;
+    private string userEmail = string.Empty;
+    private string tokenExpiration = string.Empty;
+    private string tokenIssuer = string.Empty;
+    private string tokenAudience = string.Empty;
+    private string tokenExpirationDate = string.Empty;
+    private Dictionary<string, string> userClaims = new();
+    private bool showAllClaims = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadUserDataAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadUserDataAsync()
+    {
+        try
+        {
+            // Get JWT token from localStorage (AuthenticatedRoute ensures it exists and is valid)
+            var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "jwt_token");
+            
+            if (!string.IsNullOrEmpty(token))
+            {
+                // Get user info from token
+                userName = JwtClientService.GetUserNameFromToken(token) ?? "Usuario";
+                userEmail = JwtClientService.GetUserEmailFromToken(token) ?? "";
+                
+                // Get all token information
+                var expirationDate = JwtClientService.GetTokenExpirationDate(token);
+                tokenExpiration = expirationDate?.ToString("dd/MM/yyyy HH:mm") ?? "No disponible";
+                tokenExpirationDate = expirationDate?.ToString("HH:mm:ss") ?? "No disponible";
+                tokenIssuer = JwtClientService.GetTokenIssuer(token) ?? "No disponible";
+                tokenAudience = JwtClientService.GetTokenAudience(token) ?? "No disponible";
+                
+                // Get all claims
+                userClaims = JwtClientService.GetAllClaimsFromToken(token);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't redirect - AuthenticatedRoute handles authentication
+            Console.WriteLine($"Error loading user data: {ex.Message}");
+        }
+    }
+
+    private void ToggleShowAllClaims()
+    {
+        showAllClaims = !showAllClaims;
+    }
+}
