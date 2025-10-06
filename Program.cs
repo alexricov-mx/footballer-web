@@ -13,6 +13,7 @@ builder.Services.AddHttpClient<IAuthService, AuthService>(client =>
 });
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IJwtClientService, JwtClientService>();
+builder.Services.AddScoped<IAuthStateService, AuthStateService>();
 builder.Services.AddScoped<IMemberService, MemberService>();
 builder.Services.AddScoped<IContentService, ContentService>();
 

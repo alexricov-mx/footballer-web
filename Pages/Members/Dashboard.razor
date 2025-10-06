@@ -180,7 +180,7 @@
                                                         <td>
                                                             @if (claim.Key.Contains("picture") || claim.Key.Contains("Foto"))
                                                             {
-                                                                <img src="@claim.Value" alt="Avatar" class="rounded-circle me-2" style="width: 32px; height: 32px;">
+                                                                <img src="@claim.Value" alt="Avatar" class="rounded-circle me-2" style="width: 32px; height: 32px;" referrerpolicy="no-referrer" crossorigin="anonymous" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTYiIGZpbGw9IiNEQ0RDREMiLz4KPHN2ZyB4PSI4IiB5PSI4IiB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0ZGRiI+CjxwYXRoIGQ9Ik0xMiAyQzEzLjEgMiAxNCAyLjkgMTQgNEMxNCA1LjEgMTMuMSA2IDEyIDZDMTAuOSA2IDEwIDUuMSAxMCA0QzEwIDIuOSAxMC45IDIgMTIgMlpNMjEgOVYyMkM2IDIyIDMgMTkgMyA5QzMgOC41IDMuMTggOCA0IDhIMjBDMjAuODIgOCAyMSA4LjUgMjEgOVpNMTIgMTFDMTIgMTEgNiAxNSA2IDE2QzYgMTcgNyAxNyAxOCAxN1YxMUgxMloiLz4KPHN2Zz4K';">
                                                                 <small class="text-muted">@claim.Value</small>
                                                             }
                                                             else if (claim.Key.Contains("email_verified") || claim.Key.Contains("Email Verificado"))

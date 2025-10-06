@@ -87,7 +87,7 @@ else
             await Task.Delay(100);
             
             // Check for JWT token in localStorage
-            var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "jwt_token");
+            var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
             
             if (!string.IsNullOrEmpty(token))
             {
@@ -127,8 +127,7 @@ else
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "jwt_token");
-            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "user_name");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
             AuthService.ClearUserToken();
         }
         catch (Exception ex)

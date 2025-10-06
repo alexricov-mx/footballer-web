@@ -1,0 +1,64 @@
+@using FootballerWeb.Services
+@inject IAuthStateService AuthStateService
+@inject NavigationManager Navigation
+
+@if (AuthStateService.IsAuthenticated)
+{
+    @ChildContent
+}
+else
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 50vh;">
+        <div class="text-center">
+            <div class="alert alert-warning" role="alert">
+                <h4 class="alert-heading">
+                    <i class="oi oi-lock-locked"></i> Acceso Restringido
+                </h4>
+                <p>Necesitas iniciar sesión para acceder a esta página.</p>
+                <hr>
+                <p class="mb-0">
+                    <a href="/auth/simple-login" class="btn btn-primary">
+                        <i class="oi oi-account-login"></i> Iniciar Sesión
+                    </a>
+                </p>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public bool RedirectToLogin { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Verificar autenticación al inicializar
+        await AuthStateService.CheckAuthenticationAsync();
+
+        // Si no está autenticado y se requiere redirección automática
+        if (!AuthStateService.IsAuthenticated && RedirectToLogin)
+        {
+            Navigation.NavigateTo("/auth/simple-login", true);
+        }
+
+        // Suscribirse a cambios de estado de autenticación
+        AuthStateService.AuthStateChanged += OnAuthStateChanged;
+    }
+
+    private void OnAuthStateChanged(bool isAuthenticated)
+    {
+        if (!isAuthenticated && RedirectToLogin)
+        {
+            Navigation.NavigateTo("/auth/simple-login", true);
+        }
+        else
+        {
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        AuthStateService.AuthStateChanged -= OnAuthStateChanged;
+    }
+}

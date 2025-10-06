@@ -19,23 +19,61 @@
                 <span class="oi oi-info" aria-hidden="true"></span> Acerca de
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="auth/simple-login">
-                <span class="oi oi-account-login" aria-hidden="true"></span> Iniciar Sesión
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="members/dashboard">
-                <span class="oi oi-shield" aria-hidden="true"></span> Dashboard
-            </NavLink>
-        </div>
+        
+        @if (isAuthenticated)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="members/dashboard">
+                    <span class="oi oi-dashboard" aria-hidden="true"></span> Dashboard
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <LogoutButton CssClass="nav-link" ButtonText="Cerrar Sesión" ShowConfirmation="true" />
+            </div>
+        }
+        else
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="auth/simple-login">
+                    <span class="oi oi-account-login" aria-hidden="true"></span> Iniciar Sesión
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
+@using FootballerWeb.Services
+@* @inject IAuthStateService AuthStateService *@
+@inject IJSRuntime JSRuntime
+
 @code {
     private bool collapseNavMenu = true;
+    private bool isAuthenticated = false;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await CheckAuthenticationStatus();
+        }
+    }
+
+    private async Task CheckAuthenticationStatus()
+    {
+        try
+        {
+            var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+            isAuthenticated = !string.IsNullOrEmpty(token);
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            isAuthenticated = false;
+            StateHasChanged();
+        }
+    }
 
     private void ToggleNavMenu()
     {

@@ -4,20 +4,36 @@
 @inject NavigationManager Navigation
 @inject ILogger<LogoutButton> Logger
 
-<button class="@CssClass" @onclick="HandleLogout" disabled="@isLoggingOut">
-    @if (isLoggingOut)
-    {
-        <div class="spinner-border spinner-border-sm me-2" role="status">
-            <span class="visually-hidden">Cerrando sesión...</span>
-        </div>
-        <text>Cerrando sesión...</text>
-    }
-    else
-    {
-        <i class="oi oi-account-logout me-2"></i>
-        <text>@ButtonText</text>
-    }
-</button>
+@if (CssClass == "nav-link")
+{
+    <a class="@CssClass" href="#" @onclick="HandleLogout" @onclick:preventDefault="true" disabled="@isLoggingOut">
+        @if (isLoggingOut)
+        {
+            <span class="oi oi-reload" aria-hidden="true"></span> <text>Cerrando sesión...</text>
+        }
+        else
+        {
+            <span class="oi oi-account-logout" aria-hidden="true"></span> <text>@ButtonText</text>
+        }
+    </a>
+}
+else
+{
+    <button class="@CssClass" @onclick="HandleLogout" disabled="@isLoggingOut">
+        @if (isLoggingOut)
+        {
+            <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Cerrando sesión...</span>
+            </div>
+            <text>Cerrando sesión...</text>
+        }
+        else
+        {
+            <i class="oi oi-account-logout me-2"></i>
+            <text>@ButtonText</text>
+        }
+    </button>
+}
 
 @code {
     [Parameter] public string ButtonText { get; set; } = "Cerrar Sesión";
@@ -48,8 +64,7 @@
             var logoutSuccess = await AuthService.LogoutAsync();
 
             // Clear localStorage
-            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "jwt_token");
-            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "user_name");
+            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
 
             Logger.LogInformation("User logout completed. API Success: {Success}", logoutSuccess);
 
@@ -76,8 +91,7 @@
             // Force cleanup
             try
             {
-                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "jwt_token");
-                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "user_name");
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
                 AuthService.ClearUserToken();
             }
             catch (Exception cleanupEx)
