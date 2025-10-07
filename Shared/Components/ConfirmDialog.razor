@@ -3,54 +3,26 @@
 
 @if (IsVisible)
 {
-    <div class="confirm-dialog-portal">
-        <div class="confirm-dialog-backdrop">
-            <div class="confirm-dialog-container">
-                <div class="confirm-dialog-box">
-                    <div class="confirm-dialog-header">
-                        <h5 class="confirm-dialog-title">
-                            @if (Type == ConfirmationType.Warning)
-                            {
-                                <i class="oi oi-warning text-warning me-2"></i>
-                            }
-                            else if (Type == ConfirmationType.Danger)
-                            {
-                                <i class="oi oi-warning text-danger me-2"></i>
-                            }
-                            else if (Type == ConfirmationType.Info)
-                            {
-                                <i class="oi oi-info text-info me-2"></i>
-                            }
-                            @Title
-                        </h5>
-                        @if (ShowCloseButton)
-                        {
-                            <button type="button" class="confirm-dialog-close" @onclick="Cancel">×</button>
-                        }
-                    </div>
-                    <div class="confirm-dialog-body">
-                        <p>@Message</p>
-                        @if (!string.IsNullOrEmpty(SubMessage))
-                        {
-                            <small class="text-muted">@SubMessage</small>
-                        }
-                    </div>
-                    <div class="confirm-dialog-footer">
-                        @if (ShowCancelButton)
-                        {
-                            <button type="button" class="confirm-dialog-btn confirm-dialog-btn-secondary" @onclick="Cancel" disabled="@IsProcessing">
-                                @CancelText
-                            </button>
-                        }
-                        <button type="button" class="confirm-dialog-btn @GetConfirmButtonClass()" @onclick="Confirm" disabled="@IsProcessing">
-                            @if (IsProcessing)
-                            {
-                                <span class="confirm-dialog-spinner"></span>
-                            }
-                            @ConfirmText
-                        </button>
-                    </div>
-                </div>
+    <div style="position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 2147483647 !important; background: rgba(0,0,0,0.6) !important; display: flex !important; align-items: center !important; justify-content: center !important;">
+        <div style="background: white !important; padding: 24px !important; border-radius: 12px !important; box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important; max-width: 500px !important; width: 90% !important; z-index: 2147483647 !important;">
+            <div style="text-align: center !important; margin-bottom: 20px !important;">
+                <h3 style="margin: 0 0 10px 0 !important; color: #333 !important;">@Title</h3>
+                <p style="margin: 0 !important; color: #666 !important;">@Message</p>
+            </div>
+            <div style="display: flex !important; gap: 12px !important; justify-content: center !important;">
+                @if (ShowCancelButton)
+                {
+                    <button type="button" style="padding: 10px 20px !important; border: none !important; border-radius: 6px !important; background: #6c757d !important; color: white !important; cursor: pointer !important;" @onclick="Cancel" disabled="@IsProcessing">
+                        @CancelText
+                    </button>
+                }
+                <button type="button" style="padding: 10px 20px !important; border: none !important; border-radius: 6px !important; background: #dc3545 !important; color: white !important; cursor: pointer !important;" @onclick="Confirm" disabled="@IsProcessing">
+                    @if (IsProcessing)
+                    {
+                        <span>⏳</span>
+                    }
+                    @ConfirmText
+                </button>
             </div>
         </div>
     </div>
@@ -89,13 +61,15 @@
         IsVisible = true;
         IsProcessing = false;
 
-        Console.WriteLine($"ConfirmDialog configured - Message: '{Message}', Title: '{Title}'");
+        Console.WriteLine($"ConfirmDialog configured - IsVisible: {IsVisible}, Message: '{Message}', Title: '{Title}'");
 
         // Prevent body scroll
         await JSRuntime.InvokeVoidAsync("document.body.style.setProperty", "overflow", "hidden");
 
         _tcs = new TaskCompletionSource<bool>();
         StateHasChanged();
+
+        Console.WriteLine($"ConfirmDialog StateHasChanged called - IsVisible: {IsVisible}");
 
         // Small delay to ensure DOM is updated
         await Task.Delay(50);
