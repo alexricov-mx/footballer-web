@@ -1,0 +1,114 @@
+@using FootballerWeb.Services
+@inject ToastService ToastService
+@implements IDisposable
+
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 90000;">
+    @foreach (var toast in _toasts)
+    {
+        <div class="toast show @GetToastClass(toast.Type)" role="alert" aria-live="assertive" aria-atomic="true" 
+             style="animation: slideInRight 0.3s ease-out;">
+            <div class="toast-header">
+                <div class="toast-icon me-2">
+                    @if (toast.Type == ToastType.Success)
+                    {
+                        <i class="oi oi-check text-success"></i>
+                    }
+                    else if (toast.Type == ToastType.Error)
+                    {
+                        <i class="oi oi-warning text-danger"></i>
+                    }
+                    else if (toast.Type == ToastType.Warning)
+                    {
+                        <i class="oi oi-warning text-warning"></i>
+                    }
+                    else
+                    {
+                        <i class="oi oi-info text-info"></i>
+                    }
+                </div>
+                <strong class="me-auto">@toast.Title</strong>
+                <small class="text-muted">@GetTimeAgo(toast.CreatedAt)</small>
+                <button type="button" class="btn-close" @onclick="() => RemoveToast(toast.Id)" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                @toast.Message
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ToastMessage> _toasts = new();
+    private Dictionary<string, Timer> _timers = new();
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnToastAdded += AddToast;
+        ToastService.OnToastRemoved += RemoveToast;
+    }
+
+    private void AddToast(ToastMessage toast)
+    {
+        _toasts.Add(toast);
+        InvokeAsync(StateHasChanged);
+
+        // Auto-remove after duration
+        if (toast.Duration > 0)
+        {
+            var timer = new Timer(_ => RemoveToast(toast.Id), null, toast.Duration, Timeout.Infinite);
+            _timers[toast.Id] = timer;
+        }
+    }
+
+    private void RemoveToast(string id)
+    {
+        var toast = _toasts.FirstOrDefault(t => t.Id == id);
+        if (toast != null)
+        {
+            _toasts.Remove(toast);
+            
+            if (_timers.TryGetValue(id, out var timer))
+            {
+                timer.Dispose();
+                _timers.Remove(id);
+            }
+            
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string GetToastClass(ToastType type)
+    {
+        return type switch
+        {
+            ToastType.Success => "border-success",
+            ToastType.Error => "border-danger",
+            ToastType.Warning => "border-warning",
+            ToastType.Info => "border-info",
+            _ => ""
+        };
+    }
+
+    private string GetTimeAgo(DateTime createdAt)
+    {
+        var elapsed = DateTime.Now - createdAt;
+        if (elapsed.TotalSeconds < 60)
+            return "ahora";
+        if (elapsed.TotalMinutes < 60)
+            return $"{(int)elapsed.TotalMinutes}m";
+        return $"{(int)elapsed.TotalHours}h";
+    }
+
+    public void Dispose()
+    {
+        ToastService.OnToastAdded -= AddToast;
+        ToastService.OnToastRemoved -= RemoveToast;
+        
+        foreach (var timer in _timers.Values)
+        {
+            timer.Dispose();
+        }
+        _timers.Clear();
+    }
+}
+

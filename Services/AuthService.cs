@@ -87,7 +87,7 @@ namespace FootballerWeb.Services
             try
             {
                 var request = new { Token = token };
-                var response = await _httpClient.PostAsJsonAsync("/auth/validate-token", request);
+                var response = await _httpClient.PostAsJsonAsync("/token/validate", request);
                 
                 return response.IsSuccessStatusCode;
             }
@@ -123,28 +123,28 @@ namespace FootballerWeb.Services
             AuthenticationStateChanged?.Invoke(false);
         }
 
-        public async Task<bool> LogoutAsync()
+        public Task<bool> LogoutAsync()
         {
             try
             {
-                // Call API logout endpoint
-                var response = await _httpClient.PostAsync("/auth/logout", null);
+                // Call API logout endpoint if available
+                // For now, we'll just clear the local token
+                // In a full implementation, you'd have a logout endpoint on the API
                 
-                // Clear local token regardless of API response
                 ClearUserToken();
                 
-                _logger.LogInformation("User logged out successfully. API Response: {StatusCode}", response.StatusCode);
+                _logger.LogInformation("User logged out successfully locally");
                 
-                return response.IsSuccessStatusCode;
+                return Task.FromResult(true);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during logout process");
                 
-                // Still clear local token even if API call fails
+                // Still clear local token even if there's an error
                 ClearUserToken();
                 
-                return false;
+                return Task.FromResult(false);
             }
         }
 

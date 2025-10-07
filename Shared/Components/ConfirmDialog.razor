@@ -1,0 +1,355 @@
+@using Microsoft.AspNetCore.Components
+@inject IJSRuntime JSRuntime
+
+@if (IsVisible)
+{
+    <div class="confirm-dialog-portal">
+        <div class="confirm-dialog-backdrop">
+            <div class="confirm-dialog-container">
+                <div class="confirm-dialog-box">
+                    <div class="confirm-dialog-header">
+                        <h5 class="confirm-dialog-title">
+                            @if (Type == ConfirmationType.Warning)
+                            {
+                                <i class="oi oi-warning text-warning me-2"></i>
+                            }
+                            else if (Type == ConfirmationType.Danger)
+                            {
+                                <i class="oi oi-warning text-danger me-2"></i>
+                            }
+                            else if (Type == ConfirmationType.Info)
+                            {
+                                <i class="oi oi-info text-info me-2"></i>
+                            }
+                            @Title
+                        </h5>
+                        @if (ShowCloseButton)
+                        {
+                            <button type="button" class="confirm-dialog-close" @onclick="Cancel">×</button>
+                        }
+                    </div>
+                    <div class="confirm-dialog-body">
+                        <p>@Message</p>
+                        @if (!string.IsNullOrEmpty(SubMessage))
+                        {
+                            <small class="text-muted">@SubMessage</small>
+                        }
+                    </div>
+                    <div class="confirm-dialog-footer">
+                        @if (ShowCancelButton)
+                        {
+                            <button type="button" class="confirm-dialog-btn confirm-dialog-btn-secondary" @onclick="Cancel" disabled="@IsProcessing">
+                                @CancelText
+                            </button>
+                        }
+                        <button type="button" class="confirm-dialog-btn @GetConfirmButtonClass()" @onclick="Confirm" disabled="@IsProcessing">
+                            @if (IsProcessing)
+                            {
+                                <span class="confirm-dialog-spinner"></span>
+                            }
+                            @ConfirmText
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "Confirmar acción";
+    [Parameter] public string Message { get; set; } = "¿Estás seguro de que deseas continuar?";
+    [Parameter] public string SubMessage { get; set; } = "";
+    [Parameter] public string ConfirmText { get; set; } = "Confirmar";
+    [Parameter] public string CancelText { get; set; } = "Cancelar";
+    [Parameter] public ConfirmationType Type { get; set; } = ConfirmationType.Warning;
+    [Parameter] public bool ShowCancelButton { get; set; } = true;
+    [Parameter] public bool ShowCloseButton { get; set; } = true;
+    [Parameter] public EventCallback<bool> OnResult { get; set; }
+
+    public bool IsVisible { get; private set; } = false;
+    public bool IsProcessing { get; private set; } = false;
+
+    private TaskCompletionSource<bool>? _tcs;
+
+    public enum ConfirmationType
+    {
+        Info,
+        Warning,
+        Danger
+    }
+
+    public async Task<bool> Show(string message, string title = "", ConfirmationType type = ConfirmationType.Warning)
+    {
+        Console.WriteLine($"ConfirmDialog.Show called - Message: '{message}', Title: '{title}', Type: {type}");
+        
+        Message = message;
+        Title = string.IsNullOrEmpty(title) ? GetDefaultTitle(type) : title;
+        Type = type;
+        IsVisible = true;
+        IsProcessing = false;
+
+        Console.WriteLine($"ConfirmDialog configured - Message: '{Message}', Title: '{Title}'");
+
+        // Prevent body scroll
+        await JSRuntime.InvokeVoidAsync("document.body.style.setProperty", "overflow", "hidden");
+
+        _tcs = new TaskCompletionSource<bool>();
+        StateHasChanged();
+
+        // Small delay to ensure DOM is updated
+        await Task.Delay(50);
+
+        return await _tcs.Task;
+    }
+
+    private async Task Confirm()
+    {
+        IsProcessing = true;
+        StateHasChanged();
+
+        // Small delay to show processing state
+        await Task.Delay(300);
+
+        await HideModal();
+
+        _tcs?.SetResult(true);
+        await OnResult.InvokeAsync(true);
+    }
+
+    private async Task Cancel()
+    {
+        await HideModal();
+
+        _tcs?.SetResult(false);
+        await OnResult.InvokeAsync(false);
+    }
+
+    private async Task HideModal()
+    {
+        IsVisible = false;
+        IsProcessing = false;
+        
+        // Restore body scroll
+        await JSRuntime.InvokeVoidAsync("document.body.style.removeProperty", "overflow");
+        
+        StateHasChanged();
+    }
+
+    private string GetDefaultTitle(ConfirmationType type)
+    {
+        return type switch
+        {
+            ConfirmationType.Info => "Información",
+            ConfirmationType.Warning => "Confirmar acción",
+            ConfirmationType.Danger => "Acción peligrosa",
+            _ => "Confirmar"
+        };
+    }
+
+    private string GetConfirmButtonClass()
+    {
+        return Type switch
+        {
+            ConfirmationType.Info => "confirm-dialog-btn-primary",
+            ConfirmationType.Warning => "confirm-dialog-btn-warning",
+            ConfirmationType.Danger => "confirm-dialog-btn-danger",
+            _ => "confirm-dialog-btn-primary"
+        };
+    }
+}
+
+<style>
+    /* MODAL PORTAL - Sistema completamente independiente */
+    .confirm-dialog-portal {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 2147483647 !important; /* Máximo posible */
+        pointer-events: none !important;
+    }
+
+    .confirm-dialog-backdrop {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background-color: rgba(0, 0, 0, 0.6) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        pointer-events: auto !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    }
+
+    .confirm-dialog-container {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        height: 100% !important;
+        padding: 20px !important;
+    }
+
+    .confirm-dialog-box {
+        background: white !important;
+        border-radius: 12px !important;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+        max-width: 500px !important;
+        width: 100% !important;
+        animation: confirmDialogFadeIn 0.2s ease-out !important;
+        overflow: hidden !important;
+    }
+
+    @@keyframes confirmDialogFadeIn {
+        from {
+            opacity: 0;
+            transform: scale(0.9) translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+
+    .confirm-dialog-header {
+        padding: 24px 24px 16px !important;
+        border-bottom: 1px solid #e9ecef !important;
+        background: #f8f9fa !important;
+        position: relative !important;
+        text-align: center !important;
+    }
+
+    .confirm-dialog-title {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #333 !important;
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+    }
+
+    .confirm-dialog-close {
+        position: absolute !important;
+        top: 16px !important;
+        right: 16px !important;
+        background: none !important;
+        border: none !important;
+        font-size: 24px !important;
+        color: #666 !important;
+        cursor: pointer !important;
+        width: 32px !important;
+        height: 32px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 6px !important;
+    }
+
+    .confirm-dialog-close:hover {
+        background: #f0f0f0 !important;
+        color: #333 !important;
+    }
+
+    .confirm-dialog-body {
+        padding: 24px !important;
+        text-align: center !important;
+        background: white !important;
+    }
+
+    .confirm-dialog-body p {
+        margin: 0 0 8px !important;
+        color: #555 !important;
+        font-size: 16px !important;
+        line-height: 1.5 !important;
+    }
+
+    .confirm-dialog-body small {
+        color: #888 !important;
+        font-size: 14px !important;
+    }
+
+    .confirm-dialog-footer {
+        padding: 16px 24px 24px !important;
+        background: #f8f9fa !important;
+        display: flex !important;
+        gap: 12px !important;
+        justify-content: center !important;
+    }
+
+    .confirm-dialog-btn {
+        padding: 10px 20px !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        min-width: 100px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+    }
+
+    .confirm-dialog-btn:disabled {
+        opacity: 0.6 !important;
+        cursor: not-allowed !important;
+    }
+
+    .confirm-dialog-btn-secondary {
+        background: #6c757d !important;
+        color: white !important;
+    }
+
+    .confirm-dialog-btn-secondary:hover:not(:disabled) {
+        background: #545b62 !important;
+    }
+
+    .confirm-dialog-btn-primary {
+        background: #0d6efd !important;
+        color: white !important;
+    }
+
+    .confirm-dialog-btn-primary:hover:not(:disabled) {
+        background: #0b5ed7 !important;
+    }
+
+    .confirm-dialog-btn-warning {
+        background: #ffc107 !important;
+        color: #000 !important;
+    }
+
+    .confirm-dialog-btn-warning:hover:not(:disabled) {
+        background: #e0a800 !important;
+    }
+
+    .confirm-dialog-btn-danger {
+        background: #dc3545 !important;
+        color: white !important;
+    }
+
+    .confirm-dialog-btn-danger:hover:not(:disabled) {
+        background: #bb2d3b !important;
+    }
+
+    .confirm-dialog-spinner {
+        width: 16px !important;
+        height: 16px !important;
+        border: 2px solid currentColor !important;
+        border-right-color: transparent !important;
+        border-radius: 50% !important;
+        animation: confirmDialogSpin 0.8s linear infinite !important;
+    }
+
+    @@keyframes confirmDialogSpin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+</style>

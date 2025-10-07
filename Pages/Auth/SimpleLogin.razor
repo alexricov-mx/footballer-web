@@ -3,6 +3,7 @@
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
 @inject IAuthService AuthService
+@inject ToastService ToastService
 
 <div class="login-container">
     <div class="login-card">
@@ -11,12 +12,7 @@
             <p>Inicia sesión para acceder al área de miembros</p>
         </div>
 
-        @if (!string.IsNullOrEmpty(logoutMessage))
-        {
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <i class="oi oi-check"></i> @logoutMessage
-            </div>
-        }
+
 
         @if (isLoading)
         {
@@ -67,26 +63,28 @@
 @code {
     private bool isLoading = false;
     private string errorMessage = string.Empty;
-    private string logoutMessage = string.Empty;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // Check for logout message
+            // Check for logout message and show as toast instead
             try
             {
                 var message = await JSRuntime.InvokeAsync<string?>("sessionStorage.getItem", "logout_message");
                 if (!string.IsNullOrEmpty(message))
                 {
-                    logoutMessage = message;
-                    await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "logout_message");
-                    StateHasChanged();
+                    // Show toast based on message content
+                    if (message.Contains("exitosamente"))
+                    {
+                        ToastService.ShowSuccess(message, "Sesión Cerrada");
+                    }
+                    else
+                    {
+                        ToastService.ShowWarning(message, "Sesión Cerrada");
+                    }
                     
-                    // Clear the message after 5 seconds
-                    await Task.Delay(5000);
-                    logoutMessage = string.Empty;
-                    StateHasChanged();
+                    await JSRuntime.InvokeVoidAsync("sessionStorage.removeItem", "logout_message");
                 }
             }
             catch (Exception)

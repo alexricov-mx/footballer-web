@@ -82,8 +82,17 @@
                     // Store the token in AuthService (for backward compatibility)
                     AuthService.SetUserToken(token!);
                     
-                    // Store in localStorage with the key that AuthGuard expects
+                    // Store tokens in localStorage
                     await JSRuntime.InvokeVoidAsync("localStorage.setItem", "authToken", token);
+                    
+                    // Handle refresh token if present
+                    if (query.TryGetValue("refresh_token", out var refreshTokenValue) && !string.IsNullOrEmpty(refreshTokenValue))
+                    {
+                        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "refreshToken", refreshTokenValue);
+                        
+                        // Initialize the auto-refresh service with both tokens
+                        await JSRuntime.InvokeVoidAsync("eval", $"window.tokenService?.setTokens('{token}', '{refreshTokenValue}');");
+                    }
                     
                     // Get user info from token
                     userName = JwtClientService.GetUserNameFromToken(token!) ?? "Usuario";

@@ -3,6 +3,7 @@
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
 @inject ILogger<LogoutButton> Logger
+@inject ToastService ToastService
 
 @if (CssClass == "nav-link")
 {
@@ -35,6 +36,8 @@ else
     </button>
 }
 
+<FootballerWeb.Shared.Components.ConfirmDialog @ref="confirmDialog" />
+
 @code {
     [Parameter] public string ButtonText { get; set; } = "Cerrar Sesión";
     [Parameter] public string CssClass { get; set; } = "btn btn-outline-light";
@@ -43,6 +46,7 @@ else
     [Parameter] public EventCallback OnLogoutCompleted { get; set; }
     
     private bool isLoggingOut = false;
+    private FootballerWeb.Shared.Components.ConfirmDialog? confirmDialog;
 
     private async Task HandleLogout()
     {
@@ -51,9 +55,13 @@ else
         try
         {
             // Show confirmation if enabled
-            if (ShowConfirmation)
+            if (ShowConfirmation && confirmDialog != null)
             {
-                var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", ConfirmationMessage);
+                var confirmed = await confirmDialog.Show(
+                    ConfirmationMessage, 
+                    "Cerrar Sesión", 
+                    FootballerWeb.Shared.Components.ConfirmDialog.ConfirmationType.Warning
+                );
                 if (!confirmed) return;
             }
 
@@ -63,23 +71,26 @@ else
             // Call AuthService logout
             var logoutSuccess = await AuthService.LogoutAsync();
 
-            // Clear localStorage
-            await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+            // Clear all tokens using the token service
+            await JSRuntime.InvokeVoidAsync("eval", "window.tokenService?.clearTokens();");
 
             Logger.LogInformation("User logout completed. API Success: {Success}", logoutSuccess);
 
             // Fire completion event
             await OnLogoutCompleted.InvokeAsync();
 
-            // Show appropriate message
+            // Show appropriate message with modern toast
             if (logoutSuccess)
             {
-                await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "logout_message", "Sesión cerrada exitosamente.");
+                ToastService.ShowSuccess("Sesión cerrada exitosamente. ¡Hasta pronto!", "Sesión Cerrada");
             }
             else
             {
-                await JSRuntime.InvokeVoidAsync("sessionStorage.setItem", "logout_message", "Sesión cerrada localmente. Verificar conectividad con el servidor.");
+                ToastService.ShowWarning("Sesión cerrada localmente. Verificar conectividad con el servidor.", "Sesión Cerrada");
             }
+
+            // Small delay to show the toast before redirect
+            await Task.Delay(1500);
 
             // Redirect to login
             Navigation.NavigateTo("/auth/simple-login", true);
@@ -91,7 +102,7 @@ else
             // Force cleanup
             try
             {
-                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", "authToken");
+                await JSRuntime.InvokeVoidAsync("eval", "window.tokenService?.clearTokens();");
                 AuthService.ClearUserToken();
             }
             catch (Exception cleanupEx)
@@ -99,7 +110,10 @@ else
                 Logger.LogError(cleanupEx, "Error during logout cleanup");
             }
 
-            await JSRuntime.InvokeVoidAsync("alert", "Error al cerrar sesión. Sesión limpiada localmente.");
+            ToastService.ShowError("Error al cerrar sesión. Sesión limpiada localmente.", "Error de Logout");
+            
+            // Delay and redirect
+            await Task.Delay(2000);
             Navigation.NavigateTo("/auth/simple-login", true);
         }
         finally
