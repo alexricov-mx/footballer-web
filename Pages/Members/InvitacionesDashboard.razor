@@ -75,6 +75,7 @@
                     <thead>
                         <tr>
                             <th>Email Invitado</th>
+                            <th>Código Invitación</th>
                             <th>Invitado Por</th>
                             <th>Fecha Invitación</th>
                             <th>Expira</th>
@@ -98,6 +99,16 @@
                                                 </small>
                                             </div>
                                         }
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="codigo-invitacion">
+                                        <span class="codigo-texto">@invitacion.CodigoInvitacion</span>
+                                        <button class="btn btn-xs btn-outline-secondary ms-1" 
+                                                @onclick="() => CopiarCodigo(invitacion.CodigoInvitacion)"
+                                                title="Copiar código">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
                                     </div>
                                 </td>
                                 <td>
@@ -499,6 +510,44 @@
     margin: 0;
 }
 
+/* Estilos para código de invitación */
+.codigo-invitacion {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.codigo-texto {
+    font-family: 'Courier New', monospace;
+    background: #f8f9fa;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #495057;
+    border: 1px solid #e9ecef;
+    letter-spacing: 0.5px;
+}
+
+.btn-xs {
+    padding: 4px 8px;
+    font-size: 10px;
+    min-width: 24px;
+    height: 24px;
+}
+
+.mensaje-personalizado {
+    margin-top: 4px;
+}
+
+.mensaje-personalizado small {
+    display: inline-block;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 @@keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
@@ -543,6 +592,19 @@
         catch (Exception ex)
         {
             ToastService.ShowError("Error al copiar enlace: " + ex.Message);
+        }
+    }
+
+    private async Task CopiarCodigo(string codigoInvitacion)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", codigoInvitacion);
+            ToastService.ShowSuccess($"Código de invitación '{codigoInvitacion}' copiado al portapapeles");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al copiar código: " + ex.Message);
         }
     }
 
