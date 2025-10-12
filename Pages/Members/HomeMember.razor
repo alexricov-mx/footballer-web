@@ -1,0 +1,265 @@
+@page "/members/home"
+@using FootballerWeb.Services
+@using Microsoft.AspNetCore.Components
+@using FootballerWeb.Shared.Components
+@inject IJSRuntime JSRuntime
+@inject IAuthService AuthService
+@inject IJwtClientService JwtClientService
+@inject NavigationManager Navigation
+
+<AuthGuard>
+    <div class="home-member-container">
+        <!-- Header con información del usuario -->
+        <div class="user-welcome-section">
+            <div class="container-fluid">
+                <div class="row align-items-center">
+                    <div class="col-md-2 text-center mb-3 mb-md-0">
+                        <div class="user-avatar">
+                            @if (!string.IsNullOrEmpty(userPicture))
+                            {
+                                <img src="@userPicture" alt="Avatar" class="avatar-image" referrerpolicy="no-referrer" crossorigin="anonymous" 
+                                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iNDAiIGN5PSI0MCIgcj0iNDAiIGZpbGw9IiNEQ0RDREMiLz4KPHN2ZyB4PSIyMCIgeT0iMjAiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRkZGIj4KPHN0eWxlPnBhdGh7ZmlsbDojNjY3O30vc3R5bGU+CjxwYXRoIGQ9Ik0xMiAyQzEzLjEgMiAxNCAyLjkgMTQgNEMxNCA1LjEgMTMuMSA2IDEyIDZDMTAuOSA2IDEwIDUuMSAxMCA0QzEwIDIuOSAxMC45IDIgMTIgMlpNMjEgOVYyMkM2IDIyIDMgMTkgMyA5QzMgOC41IDMuMTggOCA0IDhIMjBDMjAuODIgOCAyMSA4LjUgMjEgOVpNMTIgMTFDMTIgMTEgNiAxNSA2IDE2QzYgMTcgNyAxNyAxOCAxN1YxMUgxMloiLz4KPHN2Zz4K';">
+                            }
+                            else
+                            {
+                                <div class="default-avatar">
+                                    <i class="oi oi-person"></i>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="user-info">
+                            <h1 class="welcome-title">
+                                ¡Bienvenido! ⚽
+                            </h1>
+                            <div class="user-details">
+                                <div class="user-name">
+                                    <i class="oi oi-person me-2"></i>
+                                    <strong>@userName</strong>
+                                </div>
+                                <div class="user-email">
+                                    <i class="oi oi-envelope-closed me-2"></i>
+                                    @userEmail
+                                </div>
+                            </div>
+                            <div class="user-status">
+                                <span class="badge bg-success">
+                                    <i class="oi oi-circle-check me-1"></i>
+                                    Usuario Activo
+                                </span>
+                                <span class="text-muted ms-3">
+                                    <i class="oi oi-clock me-1"></i>
+                                    Última conexión: @DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 text-end">
+                        <LogoutButton 
+                            ButtonText="Cerrar Sesión" 
+                            CssClass="btn btn-outline-secondary btn-sm"
+                            ShowConfirmation="false" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Menús Principales -->
+        <div class="main-menu-section">
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-12">
+                        <h2 class="section-title">
+                            <i class="oi oi-dashboard me-2"></i>
+                            Panel Principal
+                        </h2>
+                        <p class="section-subtitle">Selecciona la opción que necesites para gestionar tus torneos</p>
+                    </div>
+                </div>
+
+                <div class="row justify-content-center mt-4">
+                    <!-- Mis Torneos -->
+                    <div class="col-lg-5 col-md-6 mb-4">
+                        <div class="menu-card">
+                            <div class="card-header">
+                                <div class="menu-icon">
+                                    <i class="oi oi-list-rich"></i>
+                                </div>
+                                <h3>Mis Torneos</h3>
+                                <p>Consulta y gestiona tus torneos registrados</p>
+                            </div>
+                            <div class="card-body">
+                                <ul class="feature-list">
+                                    <li><i class="oi oi-check text-success me-2"></i>Ver torneos activos</li>
+                                    <li><i class="oi oi-check text-success me-2"></i>Historial de participaciones</li>
+                                    <li><i class="oi oi-check text-success me-2"></i>Estadísticas personales</li>
+                                    <li><i class="oi oi-check text-success me-2"></i>Resultados y clasificaciones</li>
+                                </ul>
+                                <button class="btn btn-primary w-100 mt-3" @onclick="NavigateToMyTournaments">
+                                    <i class="oi oi-eye me-2"></i>
+                                    Ver Mis Torneos
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alta de Torneos -->
+                    <div class="col-lg-5 col-md-6 mb-4">
+                        <div class="menu-card">
+                            <div class="card-header">
+                                <div class="menu-icon">
+                                    <i class="oi oi-plus"></i>
+                                </div>
+                                <h3>Alta de Torneos</h3>
+                                <p>Crea y organiza nuevos torneos de fútbol</p>
+                            </div>
+                            <div class="card-body">
+                                <ul class="feature-list">
+                                    <li><i class="oi oi-check text-success me-2"></i>Configuración completa</li>
+                                    <li><i class="oi oi-check text-success me-2"></i>Gestión de equipos</li>
+                                    <li><i class="oi oi-check text-success me-2"></i>Calendario automático</li>
+                                    <li><i class="oi oi-check text-success me-2"></i>Sistema de puntuación</li>
+                                </ul>
+                                <button class="btn btn-success w-100 mt-3" @onclick="NavigateToCreateTournament">
+                                    <i class="oi oi-plus me-2"></i>
+                                    Crear Torneo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Estadísticas Rápidas -->
+        <div class="quick-stats-section">
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-12">
+                        <h3 class="stats-title">
+                            <i class="oi oi-bar-chart me-2"></i>
+                            Resumen Rápido
+                        </h3>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="oi oi-trophy text-warning"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h4>0</h4>
+                                <p>Torneos Activos</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="oi oi-calendar text-info"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h4>0</h4>
+                                <p>Próximos Partidos</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="oi oi-people text-primary"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h4>0</h4>
+                                <p>Equipos Registrados</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="oi oi-star text-success"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h4>-</h4>
+                                <p>Puntuación Promedio</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</AuthGuard>
+
+@code {
+    private string userName = string.Empty;
+    private string userEmail = string.Empty;
+    private string? userPicture = null;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadUserDataAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadUserDataAsync()
+    {
+        try
+        {
+            // Get JWT token from localStorage (AuthenticatedRoute ensures it exists and is valid)
+            var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+            
+            if (!string.IsNullOrEmpty(token))
+            {
+                Console.WriteLine("Loading user data from token...");
+                
+                // Get all claims first
+                var claims = JwtClientService.GetAllClaimsFromToken(token);
+                
+                // Debug: Log all claims
+                Console.WriteLine("Available claims:");
+                foreach (var claim in claims)
+                {
+                    Console.WriteLine($"  {claim.Key}: {claim.Value}");
+                }
+                
+                // Get user info from token using multiple possible claim names
+                userName = JwtClientService.GetUserNameFromToken(token) ?? 
+                          (claims.TryGetValue("name", out var name1) ? name1 : 
+                           claims.TryGetValue("Nombre", out var name2) ? name2 : 
+                           claims.TryGetValue("given_name", out var name3) ? name3 : "Usuario");
+                
+                userEmail = JwtClientService.GetUserEmailFromToken(token) ?? 
+                           (claims.TryGetValue("email", out var email1) ? email1 : 
+                            claims.TryGetValue("Email", out var email2) ? email2 : "");
+                
+                // Get user picture from claims
+                userPicture = claims.TryGetValue("picture", out var picture) ? picture : 
+                             claims.TryGetValue("Foto de Perfil", out var foto) ? foto : null;
+                
+                Console.WriteLine($"Loaded user data: Name='{userName}', Email='{userEmail}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't redirect - AuthenticatedRoute handles authentication
+            Console.WriteLine($"Error loading user data: {ex.Message}");
+        }
+    }
+
+    private void NavigateToMyTournaments()
+    {
+        Navigation.NavigateTo("/members/my-tournaments");
+    }
+
+    private void NavigateToCreateTournament()
+    {
+        Navigation.NavigateTo("/members/create-tournament");
+    }
+}

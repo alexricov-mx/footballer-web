@@ -1,0 +1,151 @@
+/* === RESPONSIVE STYLES === */
+@media (max-width: 1200px) {
+    .usuarios-table th,
+    .usuarios-table td {
+        padding: 16px 12px;
+    }
+    
+    .usuario-info {
+        gap: 12px;
+    }
+    
+    .avatar {
+        width: 42px;
+        height: 42px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 992px) {
+    .stats-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .search-filters {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .usuarios-dashboard {
+        padding: 16px !important;
+    }
+    
+    .title-actions {
+        flex-direction: column;
+        gap: 16px;
+        align-items: stretch;
+        text-align: center;
+    }
+    
+    .page-title {
+        font-size: 1.8rem !important;
+    }
+    
+    .stats-cards {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .search-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .search-box {
+        min-width: auto;
+    }
+    
+    .usuarios-table-container {
+        margin: 0 -10px;
+        border-radius: 12px;
+    }
+    
+    .usuarios-table table {
+        min-width: 800px;
+    }
+    
+    .usuarios-table th,
+    .usuarios-table td {
+        padding: 12px 10px;
+        font-size: 13px;
+    }
+    
+    .usuario-info {
+        gap: 10px;
+        min-width: 200px;
+    }
+    
+    .info strong {
+        font-size: 13px;
+    }
+    
+    .info small {
+        font-size: 12px;
+    }
+    
+    .avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 14px;
+    }
+    
+    .rol-badge {
+        padding: 8px 14px;
+        font-size: 10px;
+    }
+    
+    .estado-badge {
+        padding: 6px 12px;
+        font-size: 9px;
+    }
+    
+    .acciones {
+        gap: 6px;
+        min-width: 140px;
+        justify-content: center;
+    }
+    
+    .btn {
+        min-width: 40px;
+        height: 40px;
+        padding: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .page-title {
+        font-size: 1.5rem !important;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .stat-card {
+        padding: 20px;
+    }
+    
+    .usuarios-table th,
+    .usuarios-table td {
+        padding: 10px 8px;
+        font-size: 12px;
+    }
+    
+    .usuario-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        min-width: 150px;
+    }
+    
+    .acciones {
+        flex-direction: column;
+        gap: 4px;
+    }
+    
+    .btn {
+        min-width: 35px;
+        height: 35px;
+        padding: 8px;
+    }
+}

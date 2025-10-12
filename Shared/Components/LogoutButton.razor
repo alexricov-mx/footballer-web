@@ -92,8 +92,8 @@ else
             // Small delay to show the toast before redirect
             await Task.Delay(1500);
 
-            // Redirect to login
-            Navigation.NavigateTo("/auth/simple-login", true);
+            // Redirect to home page
+            Navigation.NavigateTo("/", true);
         }
         catch (Exception ex)
         {
@@ -114,7 +114,7 @@ else
             
             // Delay and redirect
             await Task.Delay(2000);
-            Navigation.NavigateTo("/auth/simple-login", true);
+            Navigation.NavigateTo("/", true);
         }
         finally
         {

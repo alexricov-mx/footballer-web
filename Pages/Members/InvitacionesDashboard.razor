@@ -1,0 +1,577 @@
+@page "/members/invitaciones"
+@using FootballerWeb.Services
+@using FootballerWeb.DTOs
+@inject UsuarioService UsuarioService
+@inject ToastService ToastService
+@inject IJwtClientService JwtService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+<div class="invitaciones-dashboard">
+    <div class="header-section">
+        <div class="title-actions">
+            <h2 class="page-title">
+                <i class="fas fa-envelope"></i>
+                Invitaciones Pendientes
+            </h2>
+            <a href="/members/usuarios" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i>
+                Volver a Usuarios
+            </a>
+        </div>
+        
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-envelope text-primary"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>@invitaciones.Count</h3>
+                    <p>Total Invitaciones</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-clock text-warning"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>@invitaciones.Count(i => i.FechaExpiracion > DateTime.UtcNow)</h3>
+                    <p>Activas</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-times-circle text-danger"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>@invitaciones.Count(i => i.FechaExpiracion <= DateTime.UtcNow)</h3>
+                    <p>Expiradas</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Cargando invitaciones...</p>
+        </div>
+    }
+    else if (!invitaciones.Any())
+    {
+        <div class="empty-state">
+            <i class="fas fa-envelope fa-3x text-muted"></i>
+            <h3>No hay invitaciones pendientes</h3>
+            <p>Todas las invitaciones han sido procesadas</p>
+        </div>
+    }
+    else
+    {
+        <div class="invitaciones-table-container">
+            <div class="invitaciones-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Email Invitado</th>
+                            <th>Invitado Por</th>
+                            <th>Fecha Invitación</th>
+                            <th>Expira</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var invitacion in invitaciones)
+                        {
+                            var esExpirada = invitacion.FechaExpiracion <= DateTime.UtcNow;
+                            <tr class="invitacion-row @(esExpirada ? "expirada" : "")">
+                                <td>
+                                    <div class="email-info">
+                                        <strong>@invitacion.EmailInvitado</strong>
+                                        @if (!string.IsNullOrEmpty(invitacion.MensajePersonalizado))
+                                        {
+                                            <div class="mensaje-personalizado">
+                                                <small class="text-info">
+                                                    <i class="fas fa-comment"></i> @invitacion.MensajePersonalizado
+                                                </small>
+                                            </div>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="invitador">@invitacion.NombreInvitador</span>
+                                </td>
+                                <td>
+                                    <span class="fecha">@invitacion.FechaInvitacion.ToString("dd/MM/yyyy HH:mm")</span>
+                                </td>
+                                <td>
+                                    <span class="fecha-expiracion @(esExpirada ? "expirada" : "")">
+                                        @invitacion.FechaExpiracion.ToString("dd/MM/yyyy HH:mm")
+                                        @if (esExpirada)
+                                        {
+                                            <i class="fas fa-exclamation-triangle text-danger"></i>
+                                        }
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (esExpirada)
+                                    {
+                                        <span class="estado-badge expirada">EXPIRADA</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="estado-badge activa">ACTIVA</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="acciones">
+                                        @if (!esExpirada)
+                                        {
+                                            <button class="btn btn-sm btn-outline-primary" 
+                                                    @onclick="() => CopiarEnlaceInvitacion(invitacion)"
+                                                    title="Copiar enlace">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info" 
+                                                    @onclick="() => ReenviarInvitacion(invitacion)"
+                                                    title="Reenviar invitación">
+                                                <i class="fas fa-paper-plane"></i>
+                                            </button>
+                                        }
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                @onclick="() => CancelarInvitacion(invitacion)"
+                                                title="Cancelar invitación">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+/* ESTILOS PARA DASHBOARD DE INVITACIONES */
+.invitaciones-dashboard {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+}
+
+.header-section {
+    margin-bottom: 30px;
+}
+
+.title-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.page-title {
+    color: #2c3e50;
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.page-title i {
+    color: #667eea;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    text-decoration: none;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+    color: white;
+    text-decoration: none;
+}
+
+/* STATS CARDS */
+.stats-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.stat-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.stat-icon i {
+    font-size: 1.8rem;
+}
+
+.stat-info h3 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin: 0;
+    color: #2c3e50;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.stat-info p {
+    margin: 0;
+    font-size: 1rem;
+    color: #7f8c8d;
+    font-weight: 600;
+}
+
+/* TABLA CONTAINER */
+.invitaciones-table-container {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+}
+
+.invitaciones-table table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: white;
+    font-size: 14px;
+}
+
+.invitaciones-table th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px 18px;
+    text-align: left;
+    font-weight: 700;
+    color: white;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.2);
+}
+
+.invitaciones-table td {
+    padding: 22px 18px;
+    border-bottom: 1px solid #f8f9fa;
+    vertical-align: middle;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.invitacion-row {
+    transition: all 0.3s ease;
+}
+
+.invitacion-row:hover {
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+}
+
+.invitacion-row:hover td {
+    background: transparent;
+    border-color: #e0e7ff;
+}
+
+.invitacion-row.expirada {
+    opacity: 0.7;
+    background: rgba(220, 53, 69, 0.05);
+}
+
+.email-info strong {
+    color: #2c3e50;
+    font-weight: 700;
+    font-size: 15px;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.email-info small {
+    color: #7f8c8d;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.invitador {
+    color: #495057;
+    font-weight: 600;
+}
+
+.fecha {
+    color: #6c757d;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.fecha-expiracion.expirada {
+    color: #dc3545;
+    font-weight: 700;
+}
+
+.estado-badge {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.estado-badge.activa {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+
+.estado-badge.expirada {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+}
+
+.acciones {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.btn {
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    text-transform: none;
+    min-width: 35px;
+    height: 35px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+.btn:hover {
+    transform: translateY(-3px) scale(1.05);
+}
+
+.btn-outline-primary {
+    border: 1px solid #667eea;
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.btn-outline-primary:hover {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.btn-outline-info {
+    border: 1px solid #17a2b8;
+    color: #17a2b8;
+    background: rgba(23, 162, 184, 0.1);
+}
+
+.btn-outline-info:hover {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 8px 20px rgba(23, 162, 184, 0.3);
+}
+
+.btn-outline-danger {
+    border: 1px solid #dc3545;
+    color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.btn-outline-danger:hover {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 8px 20px rgba(220, 53, 69, 0.3);
+}
+
+.loading-container {
+    text-align: center;
+    padding: 60px 20px;
+    color: #7f8c8d;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px auto;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.empty-state i {
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    color: #495057;
+    margin-bottom: 10px;
+}
+
+.empty-state p {
+    color: #6c757d;
+    margin: 0;
+}
+
+@@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+
+@code {
+    private List<InvitacionPendiente> invitaciones = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarInvitaciones();
+    }
+
+    private async Task CargarInvitaciones()
+    {
+        isLoading = true;
+        try
+        {
+            invitaciones = await UsuarioService.GetInvitacionesPendientesAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al cargar invitaciones: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CopiarEnlaceInvitacion(InvitacionPendiente invitacion)
+    {
+        try
+        {
+            var enlace = $"{NavigationManager.BaseUri}registro?codigo={invitacion.CodigoInvitacion}";
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", enlace);
+            ToastService.ShowSuccess("Enlace de invitación copiado al portapapeles");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al copiar enlace: " + ex.Message);
+        }
+    }
+
+    private async Task ReenviarInvitacion(InvitacionPendiente invitacion)
+    {
+        try
+        {
+            // TODO: Implementar reenvío de invitación
+            ToastService.ShowInfo("Funcionalidad de reenvío próximamente");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al reenviar invitación: " + ex.Message);
+        }
+    }
+
+    private async Task CancelarInvitacion(InvitacionPendiente invitacion)
+    {
+        if (await JSRuntime.InvokeAsync<bool>("confirm", $"¿Estás seguro de cancelar la invitación para {invitacion.EmailInvitado}?"))
+        {
+            try
+            {
+                // TODO: Implementar cancelación de invitación
+                ToastService.ShowInfo("Funcionalidad de cancelación próximamente");
+            }
+            catch (Exception ex)
+            {
+                ToastService.ShowError("Error al cancelar invitación: " + ex.Message);
+            }
+        }
+    }
+}

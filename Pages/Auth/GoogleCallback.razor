@@ -25,7 +25,7 @@
                 <i class="bi bi-check-circle-fill" style="font-size: 3rem;"></i>
                 <h4 class="mt-3">¡Autenticación exitosa!</h4>
                 <p>Bienvenido, @userName</p>
-                <p>Redirigiendo al dashboard...</p>
+                <p>Redirigiendo a tu página de inicio...</p>
             </div>
         }
         else
@@ -101,9 +101,9 @@
                     isProcessing = false;
                     StateHasChanged();
                     
-                    // Redirect to dashboard after 2 seconds
+                    // Redirect to home member after 2 seconds
                     await Task.Delay(2000);
-                    Navigation.NavigateTo("/members/dashboard");
+                    Navigation.NavigateTo("/members/home");
                 }
                 else
                 {

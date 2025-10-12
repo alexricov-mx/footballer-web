@@ -1,0 +1,1704 @@
+@page "/members/usuarios"
+@using FootballerWeb.Services
+@using FootballerWeb.DTOs
+@inject UsuarioService UsuarioService
+@inject ToastService ToastService
+@inject IJwtClientService JwtService
+@inject IJSRuntime JSRuntime
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+
+@* Título de página *@
+
+<div class="usuarios-dashboard">
+    <div class="header-section">
+        <div class="title-actions">
+            <h2 class="page-title">
+                <i class="fas fa-users"></i>
+                Gestión de Usuarios
+            </h2>
+            <div class="actions-group">
+                <a href="/members/invitaciones" class="btn btn-outline-info">
+                    <i class="fas fa-envelope"></i>
+                    Ver Invitaciones
+                </a>
+                <button class="btn btn-primary" @onclick="MostrarModalInvitar">
+                    <i class="fas fa-user-plus"></i>
+                    Invitar Usuario
+                </button>
+            </div>
+        </div>
+        
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-users text-primary"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>@usuarios.Count</h3>
+                    <p>Total Usuarios</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-user-check text-success"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>@usuarios.Count(u => u.Estado == "activo")</h3>
+                    <p>Activos</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-crown text-warning"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>@usuarios.Count(u => u.RolNombre == "super_admin" || u.RolNombre == "admin_liga" || u.RolNombre == "admin_equipo")</h3>
+                    <p>Administradores</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Cargando usuarios...</p>
+        </div>
+    }
+    else if (!usuarios.Any())
+    {
+        <div class="empty-state">
+            <i class="fas fa-users fa-3x text-muted"></i>
+            <h3>No hay usuarios registrados</h3>
+            <p>Invita al primer usuario para comenzar</p>
+        </div>
+    }
+    else
+    {
+        <div class="usuarios-table-container">
+            <div class="table-header">
+                <div class="search-filters">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" @bind="filtroNombre" @oninput="FiltrarUsuarios" placeholder="Buscar por nombre o email..." />
+                    </div>
+                    <select @bind="filtroRol" class="form-select" @bind:after="FiltrarUsuarios">
+                        <option value="">Todos los roles</option>
+                        <option value="super_admin">Super Admin</option>
+                        <option value="admin_liga">Admin Liga</option>
+                        <option value="admin_equipo">Admin Equipo</option>
+                        <option value="arbitro">Árbitro</option>
+                        <option value="consulta">Consulta</option>
+                    </select>
+                    <select @bind="filtroEstado" class="form-select" @bind:after="FiltrarUsuarios">
+                        <option value="">Todos los estados</option>
+                        <option value="activo">Activo</option>
+                        <option value="suspendido">Suspendido</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="usuarios-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                            <th>Estado</th>
+                            <th>Ligas</th>
+                            <th>Último Acceso</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var usuario in usuariosFiltrados)
+                        {
+                            <tr class="usuario-row @(usuario.Estado == "suspendido" ? "suspended" : "")">
+                                <td>
+                                    <div class="usuario-info">
+                                        <div class="avatar">
+                                            <span>@(GetInitials(usuario.NombreCompleto))</span>
+                                        </div>
+                                        <div class="info">
+                                            <strong>@usuario.NombreCompleto</strong>
+                                            <small>@usuario.Email</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="rol-badge @GetRolClass(usuario.RolNombre)">
+                                        @GetRolDisplayName(usuario.RolNombre)
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="estado-badge @(usuario.Estado == "activo" ? "activo" : "suspendido")">
+                                        @usuario.Estado.ToUpper()
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="ligas-count">
+                                        @usuario.TotalLigas @(usuario.TotalLigas == 1 ? "liga" : "ligas")
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (usuario.UltimoAcceso.HasValue)
+                                    {
+                                        <span class="fecha">@usuario.UltimoAcceso.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Nunca</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="acciones">
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => VerDetalleUsuario(usuario.IdUsuario)">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        @if (usuario.RolNombre != "super_admin")
+                                        {
+                                            <button class="btn btn-sm btn-outline-warning" @onclick="() => CambiarRolUsuario(usuario)" title="Cambiar rol">
+                                                <i class="fas fa-user-cog"></i>
+                                            </button>
+                                            <button class="btn btn-sm @(usuario.Estado == "activo" ? "btn-outline-danger" : "btn-outline-success")" 
+                                                    @onclick="() => CambiarEstadoUsuario(usuario)"
+                                                    title="@(usuario.Estado == "activo" ? "Suspender" : "Activar")">
+                                                <i class="fas @(usuario.Estado == "activo" ? "fa-ban" : "fa-check")"></i>
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Modal para invitar usuario -->
+@if (mostrarModalInvitar)
+{
+    <div class="modal-overlay" @onclick="CerrarModalInvitar">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>Invitar Nuevo Usuario</h3>
+                <button class="btn-close" @onclick="CerrarModalInvitar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form @onsubmit="EnviarInvitacion" @onsubmit:preventDefault="true">
+                    <div class="form-group">
+                        <label>Email del usuario</label>
+                        <input type="email" @bind="emailInvitacion" class="form-control" placeholder="usuario@ejemplo.com" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Mensaje personalizado (opcional)</label>
+                        <textarea @bind="mensajeInvitacion" class="form-control" rows="3" placeholder="Mensaje de bienvenida..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CerrarModalInvitar">Cancelar</button>
+                <button class="btn btn-primary" @onclick="EnviarInvitacion" disabled="@enviandoInvitacion">
+                    @if (enviandoInvitacion)
+                    {
+                        <span class="spinner-sm"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-envelope"></i>
+                    }
+                    Enviar Invitación
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal para detalle de usuario -->
+@if (mostrarModalDetalle && usuarioDetalle != null)
+{
+    <div class="modal-overlay" @onclick="CerrarModalDetalle">
+        <div class="modal-content modal-lg" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>Detalle del Usuario</h3>
+                <button class="btn-close" @onclick="CerrarModalDetalle">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="usuario-detalle">
+                    <div class="usuario-header">
+                        <div class="avatar-lg">
+                            @if (!string.IsNullOrEmpty(usuarioDetalle.FotoPerfil))
+                            {
+                                <img src="@usuarioDetalle.FotoPerfil" alt="@usuarioDetalle.NombreCompleto" />
+                            }
+                            else
+                            {
+                                <span>@GetInitials(usuarioDetalle.NombreCompleto)</span>
+                            }
+                        </div>
+                        <div class="usuario-info">
+                            <h4>@usuarioDetalle.NombreCompleto</h4>
+                            <p>@usuarioDetalle.Email</p>
+                            <span class="rol-badge @GetRolClass(usuarioDetalle.RolNombre)">
+                                @GetRolDisplayName(usuarioDetalle.RolNombre)
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Estado</label>
+                            <span class="estado-badge @(usuarioDetalle.Estado == "activo" ? "activo" : "suspendido")">
+                                @usuarioDetalle.Estado.ToUpper()
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <label>Fecha de Registro</label>
+                            <span>@usuarioDetalle.FechaRegistro?.ToString("dd/MM/yyyy HH:mm")</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Último Acceso</label>
+                            <span>@(usuarioDetalle.UltimoAcceso?.ToString("dd/MM/yyyy HH:mm") ?? "Nunca")</span>
+                        </div>
+                    </div>
+                    
+                    <div class="ligas-section">
+                        <h5>Ligas en las que participa (@usuarioDetalle.Ligas.Count)</h5>
+                        @if (usuarioDetalle.Ligas.Any())
+                        {
+                            <div class="ligas-list">
+                                @foreach (var liga in usuarioDetalle.Ligas)
+                                {
+                                    <div class="liga-item">
+                                        <div class="liga-info">
+                                            <strong>@liga.Nombre</strong>
+                                            <span class="rol-liga">@liga.RolEnLiga</span>
+                                        </div>
+                                        <small>Desde: @liga.FechaIngreso.ToString("dd/MM/yyyy")</small>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted">No participa en ninguna liga actualmente</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal para cambiar rol -->
+@if (mostrarModalCambiarRol && usuarioEditandoRol != null)
+{
+    <div class="modal-overlay" @onclick="CerrarModalCambiarRol">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h3>Cambiar Rol de Usuario</h3>
+                <button class="btn-close" @onclick="CerrarModalCambiarRol">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="usuario-cambio-rol">
+                    <div class="usuario-info-header">
+                        <div class="avatar">
+                            <span>@GetInitials(usuarioEditandoRol.NombreCompleto)</span>
+                        </div>
+                        <div class="info">
+                            <h4>@usuarioEditandoRol.NombreCompleto</h4>
+                            <p>@usuarioEditandoRol.Email</p>
+                            <span class="rol-actual">
+                                Rol actual: <span class="rol-badge @GetRolClass(usuarioEditandoRol.RolNombre)">
+                                    @GetRolDisplayName(usuarioEditandoRol.RolNombre)
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    @if (cargandoRoles)
+                    {
+                        <div class="loading-roles">
+                            <div class="spinner-sm"></div>
+                            <span>Cargando roles...</span>
+                        </div>
+                    }
+                    else if (rolesDisponibles.Any())
+                    {
+                        <div class="roles-selection">
+                            <label class="form-label">Seleccionar nuevo rol:</label>
+                            <div class="roles-grid">
+                                @foreach (var rol in rolesDisponibles)
+                                {
+                                    <div class="rol-option @(rolSeleccionado == rol.IdRol ? "selected" : "")" 
+                                         @onclick="() => rolSeleccionado = rol.IdRol">
+                                        <div class="rol-radio">
+                                            <input type="radio" 
+                                                   name="rolUsuario" 
+                                                   value="@rol.IdRol" 
+                                                   @onchange="() => rolSeleccionado = rol.IdRol"
+                                                   checked="@(rolSeleccionado == rol.IdRol)" />
+                                        </div>
+                                        <div class="rol-info">
+                                            <span class="rol-badge @GetRolClass(rol.Nombre)">
+                                                @GetRolDisplayName(rol.Nombre)
+                                            </span>
+                                            @if (!string.IsNullOrEmpty(rol.Descripcion))
+                                            {
+                                                <small class="rol-descripcion">@rol.Descripcion</small>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            
+                            @if (rolSeleccionado > 0 && rolesDisponibles.Any())
+                            {
+                                var rolSeleccionadoInfo = rolesDisponibles.First(r => r.IdRol == rolSeleccionado);
+                                <div class="cambio-preview">
+                                    <i class="fas fa-arrow-right text-primary"></i>
+                                    <span>El usuario tendrá el rol: 
+                                        <strong class="rol-badge @GetRolClass(rolSeleccionadoInfo.Nombre)">
+                                            @GetRolDisplayName(rolSeleccionadoInfo.Nombre)
+                                        </strong>
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="error-roles">
+                            <i class="fas fa-exclamation-circle text-warning"></i>
+                            <span>No se pudieron cargar los roles disponibles</span>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CerrarModalCambiarRol" disabled="@cambiandoRol">
+                    Cancelar
+                </button>
+                <button class="btn btn-primary" 
+                        @onclick="ConfirmarCambioRol" 
+                        disabled="@(cambiandoRol || rolSeleccionado == 0 || cargandoRoles)">
+                    @if (cambiandoRol)
+                    {
+                        <span class="spinner-sm"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-save"></i>
+                    }
+                    Cambiar Rol
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal de confirmación personalizado -->
+@if (mostrarModalConfirmacion)
+{
+    <div class="modal-overlay" @onclick="CerrarModalConfirmacion">
+        <div class="modal-content modal-confirmacion" @onclick:stopPropagation="true">
+            <div class="modal-header modal-header-@tipoConfirmacion">
+                <div class="confirmacion-icon">
+                    @if (tipoConfirmacion == "warning")
+                    {
+                        <i class="fas fa-exclamation-triangle"></i>
+                    }
+                    else if (tipoConfirmacion == "danger")
+                    {
+                        <i class="fas fa-times-circle"></i>
+                    }
+                    else if (tipoConfirmacion == "success")
+                    {
+                        <i class="fas fa-check-circle"></i>
+                    }
+                    else
+                    {
+                        <i class="fas fa-info-circle"></i>
+                    }
+                </div>
+                <h3>@tituloConfirmacion</h3>
+            </div>
+            <div class="modal-body">
+                <div class="confirmacion-mensaje">
+                    @((MarkupString)mensajeConfirmacion)
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="CerrarModalConfirmacion" disabled="@ejecutandoAccion">
+                    Cancelar
+                </button>
+                <button class="btn btn-@(tipoConfirmacion == "success" ? "success" : (tipoConfirmacion == "danger" ? "danger" : "warning"))" 
+                        @onclick="EjecutarAccionConfirmacion" 
+                        disabled="@ejecutandoAccion">
+                    @if (ejecutandoAccion)
+                    {
+                        <span class="spinner-sm"></span>
+                    }
+                    else if (tipoConfirmacion == "success")
+                    {
+                        <i class="fas fa-check"></i>
+                    }
+                    else if (tipoConfirmacion == "danger")
+                    {
+                        <i class="fas fa-trash"></i>
+                    }
+                    else
+                    {
+                        <i class="fas fa-exclamation"></i>
+                    }
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+/* ESTILOS CRÍTICOS PARA LA PÁGINA DE USUARIOS */
+.usuarios-dashboard {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+}
+
+.header-section {
+    margin-bottom: 30px;
+}
+
+.title-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.page-title {
+    color: #2c3e50;
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.page-title i {
+    color: #667eea;
+}
+
+.actions-group {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.btn-outline-info {
+    border: 2px solid #17a2b8;
+    color: #17a2b8;
+    background: rgba(23, 162, 184, 0.1);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-outline-info:hover {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 10px 30px rgba(23, 162, 184, 0.4);
+    text-decoration: none;
+}
+
+/* STATS CARDS */
+.stats-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.stat-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.stat-icon i {
+    font-size: 1.8rem;
+}
+
+.stat-info h3 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    margin: 0;
+    color: #2c3e50;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.stat-info p {
+    margin: 0;
+    font-size: 1rem;
+    color: #7f8c8d;
+    font-weight: 600;
+}
+
+/* TABLA CONTAINER */
+.usuarios-table-container {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+}
+
+.table-header {
+    padding: 25px;
+    border-bottom: 1px solid #f0f2f5;
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+}
+
+.search-filters {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.search-box {
+    position: relative;
+    flex: 1;
+    min-width: 300px;
+}
+
+.search-box i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #667eea;
+    font-size: 16px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 15px 20px 15px 50px;
+    border: 2px solid #e1e8ed;
+    border-radius: 12px;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    background: white;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.search-box input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+    transform: translateY(-2px);
+}
+
+.form-select {
+    padding: 15px 18px;
+    border: 2px solid #e1e8ed;
+    border-radius: 12px;
+    background: white;
+    min-width: 160px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #2c3e50;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+}
+
+/* TABLA */
+.usuarios-table table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: white;
+    font-size: 14px;
+}
+
+.usuarios-table th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px 18px;
+    text-align: left;
+    font-weight: 700;
+    color: white;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.2);
+}
+
+.usuarios-table td {
+    padding: 22px 18px;
+    border-bottom: 1px solid #f8f9fa;
+    vertical-align: middle;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.usuario-row {
+    transition: all 0.3s ease;
+}
+
+.usuario-row:hover {
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+}
+
+.usuario-row:hover td {
+    background: transparent;
+    border-color: #e0e7ff;
+}
+
+/* USER INFO */
+.usuario-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 18px;
+    flex-shrink: 0;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    border: 3px solid white;
+    transition: all 0.3s ease;
+}
+
+.usuario-row:hover .avatar {
+    transform: scale(1.15) rotate(8deg);
+    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.6);
+}
+
+.info strong {
+    display: block;
+    color: #2c3e50;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.info small {
+    color: #7f8c8d;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* CHIPS DE ROLES */
+.rol-badge {
+    padding: 10px 18px;
+    border-radius: 25px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.rol-badge.super-admin {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: white;
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.5);
+}
+
+.rol-badge.admin {
+    background: linear-gradient(135deg, #ffa502, #ff6348);
+    color: white;
+    box-shadow: 0 6px 20px rgba(255, 165, 2, 0.5);
+}
+
+.rol-badge.arbitro {
+    background: linear-gradient(135deg, #a55eea, #8e44ad);
+    color: white;
+    box-shadow: 0 6px 20px rgba(165, 94, 234, 0.5);
+}
+
+.rol-badge.consulta {
+    background: linear-gradient(135deg, #778ca3, #57606f);
+    color: white;
+    box-shadow: 0 6px 20px rgba(119, 140, 163, 0.5);
+}
+
+.rol-badge:hover {
+    transform: translateY(-3px) scale(1.05);
+}
+
+/* ESTADO BADGES */
+.estado-badge {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+}
+
+.estado-badge.activo {
+    background: linear-gradient(135deg, #00d2d3, #01a3a4);
+    color: white;
+}
+
+.estado-badge.suspendido {
+    background: linear-gradient(135deg, #ff3838, #c0392b);
+    color: white;
+}
+
+/* BOTONES DE ACCIÓN */
+.acciones {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.btn {
+    padding: 12px 15px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    text-transform: none;
+    min-width: 45px;
+    height: 45px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.btn:hover {
+    transform: translateY(-4px) scale(1.1);
+}
+
+.btn-outline-primary {
+    border: 2px solid #667eea;
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.btn-outline-primary:hover {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+}
+
+.btn-outline-warning {
+    border: 2px solid #ffa502;
+    color: #ffa502;
+    background: rgba(255, 165, 2, 0.1);
+}
+
+.btn-outline-warning:hover {
+    background: linear-gradient(135deg, #ffa502, #ff6348);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 10px 30px rgba(255, 165, 2, 0.4);
+}
+
+.btn-outline-danger {
+    border: 2px solid #ff6b6b;
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.1);
+}
+
+.btn-outline-danger:hover {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+}
+
+.btn-outline-success {
+    border: 2px solid #00d2d3;
+    color: #00d2d3;
+    background: rgba(0, 210, 211, 0.1);
+}
+
+.btn-outline-success:hover {
+    background: linear-gradient(135deg, #00d2d3, #01a3a4);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 10px 30px rgba(0, 210, 211, 0.4);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #764ba2, #667eea);
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+}
+
+/* Estilos base sin media queries para evitar conflictos con Razor */
+.usuarios-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.usuarios-table table {
+    min-width: 700px;
+}
+
+/* MODAL CAMBIAR ROL */
+.usuario-cambio-rol {
+    padding: 10px 0;
+}
+
+.usuario-info-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+    border-radius: 15px;
+    border: 2px solid #e0e7ff;
+}
+
+.usuario-info-header .avatar {
+    width: 70px;
+    height: 70px;
+    font-size: 22px;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.usuario-info-header .info h4 {
+    color: #2c3e50;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+}
+
+.usuario-info-header .info p {
+    color: #7f8c8d;
+    font-size: 14px;
+    margin: 0 0 12px 0;
+    font-weight: 500;
+}
+
+.rol-actual {
+    font-size: 13px;
+    color: #5a6c7d;
+    font-weight: 600;
+}
+
+.loading-roles {
+    text-align: center;
+    padding: 30px;
+    color: #7f8c8d;
+    font-weight: 500;
+}
+
+.loading-roles .spinner-sm {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.roles-selection {
+    margin-top: 20px;
+}
+
+.form-label {
+    font-weight: 700;
+    color: #2c3e50;
+    font-size: 15px;
+    margin-bottom: 20px;
+    display: block;
+}
+
+.roles-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 25px;
+}
+
+.rol-option {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 18px 20px;
+    border: 2px solid #e1e8ed;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.rol-option::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.rol-option:hover {
+    border-color: #667eea;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+    transform: translateY(-2px);
+}
+
+.rol-option:hover::before {
+    opacity: 1;
+}
+
+.rol-option.selected {
+    border-color: #667eea;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.25);
+    transform: translateY(-3px);
+}
+
+.rol-option.selected::before {
+    opacity: 1;
+}
+
+.rol-radio {
+    position: relative;
+    z-index: 2;
+}
+
+.rol-radio input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #667eea;
+    cursor: pointer;
+}
+
+.rol-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    z-index: 2;
+}
+
+.rol-descripcion {
+    color: #7f8c8d;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.cambio-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 20px;
+    background: linear-gradient(135deg, #e8f5e8 0%, #d4f1d4 100%);
+    border: 2px solid #27ae60;
+    border-radius: 12px;
+    margin-top: 20px;
+    font-weight: 600;
+    color: #27ae60;
+}
+
+.cambio-preview i {
+    font-size: 18px;
+}
+
+.error-roles {
+    text-align: center;
+    padding: 30px;
+    color: #e67e22;
+    font-weight: 500;
+}
+
+.error-roles i {
+    font-size: 24px;
+    margin-right: 10px;
+}
+
+.spinner-sm {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+@@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* MODAL GENERAL */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(8px);
+}
+
+.modal-content {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: modalAppear 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.modal-content.modal-lg {
+    max-width: 800px;
+}
+
+@@keyframes modalAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.7) translateY(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-header {
+    padding: 25px 30px 20px 30px;
+    border-bottom: 1px solid #f0f2f5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+    border-radius: 20px 20px 0 0;
+}
+
+.modal-header h3 {
+    color: #2c3e50;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.btn-close {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #7f8c8d;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.btn-close:hover {
+    background: #ff6b6b;
+    color: white;
+    transform: rotate(90deg) scale(1.1);
+}
+
+.modal-body {
+    padding: 30px;
+}
+
+.modal-footer {
+    padding: 20px 30px 30px 30px;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    border-top: 1px solid #f0f2f5;
+    background: #f8f9fa;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+}
+
+.btn-secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* MODAL DE CONFIRMACIÓN */
+.modal-confirmacion {
+    max-width: 500px;
+}
+
+.modal-header-warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-bottom: 2px solid #ffc107;
+}
+
+.modal-header-danger {
+    background: linear-gradient(135deg, #f8d7da 0%, #ff9999 100%);
+    border-bottom: 2px solid #dc3545;
+}
+
+.modal-header-success {
+    background: linear-gradient(135deg, #d1ecf1 0%, #a8e6cf 100%);
+    border-bottom: 2px solid #28a745;
+}
+
+.modal-header-info {
+    background: linear-gradient(135deg, #cce7ff 0%, #99d6ff 100%);
+    border-bottom: 2px solid #007bff;
+}
+
+.confirmacion-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin: 0 auto 15px auto;
+    color: white;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header-warning .confirmacion-icon {
+    background: linear-gradient(135deg, #ffc107, #ff8c00);
+}
+
+.modal-header-danger .confirmacion-icon {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+}
+
+.modal-header-success .confirmacion-icon {
+    background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+.modal-header-info .confirmacion-icon {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+}
+
+.modal-header-warning h3,
+.modal-header-danger h3,
+.modal-header-success h3,
+.modal-header-info h3 {
+    text-align: center;
+    margin: 0;
+    font-weight: 700;
+}
+
+.modal-header-warning h3 { color: #856404; }
+.modal-header-danger h3 { color: #721c24; }
+.modal-header-success h3 { color: #155724; }
+.modal-header-info h3 { color: #004085; }
+
+.confirmacion-mensaje {
+    text-align: center;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #495057;
+    padding: 10px 0;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #ffc107, #ff8c00);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #ff8c00, #ffc107);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #c82333, #dc3545);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #20c997, #28a745);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+.btn-warning:disabled,
+.btn-danger:disabled,
+.btn-success:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+</style>
+
+<link href="~/css/usuarios-dashboard.css" rel="stylesheet" />
+<link href="~/css/usuarios-responsive.css" rel="stylesheet" />
+
+@code {
+    private List<UsuarioDashboard> usuarios = new();
+    private List<UsuarioDashboard> usuariosFiltrados = new();
+    private bool isLoading = true;
+    private string filtroNombre = string.Empty;
+    private string filtroRol = string.Empty;
+    private string filtroEstado = string.Empty;
+    
+    // Modal invitar usuario
+    private bool mostrarModalInvitar = false;
+    private string emailInvitacion = string.Empty;
+    private string mensajeInvitacion = string.Empty;
+    private bool enviandoInvitacion = false;
+    
+    // Modal detalle usuario
+    private bool mostrarModalDetalle = false;
+    private DetalleUsuario? usuarioDetalle = null;
+    
+    // Modal cambiar rol
+    private bool mostrarModalCambiarRol = false;
+    private UsuarioDashboard? usuarioEditandoRol = null;
+    private List<RolUsuario> rolesDisponibles = new();
+    private int rolSeleccionado = 0;
+    private bool cargandoRoles = false;
+    private bool cambiandoRol = false;
+    
+    // Modal confirmación
+    private bool mostrarModalConfirmacion = false;
+    private string tituloConfirmacion = string.Empty;
+    private string mensajeConfirmacion = string.Empty;
+    private string tipoConfirmacion = "warning"; // warning, danger, success, info
+    private Func<Task>? accionConfirmacion = null;
+    private bool ejecutandoAccion = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarUsuarios();
+    }
+
+    private async Task CargarUsuarios()
+    {
+        isLoading = true;
+        try
+        {
+            usuarios = await UsuarioService.GetUsuariosAsync();
+            usuariosFiltrados = usuarios.ToList();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al cargar usuarios: " + ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void FiltrarUsuarios()
+    {
+        usuariosFiltrados = usuarios.Where(u =>
+            (string.IsNullOrEmpty(filtroNombre) || 
+             u.NombreCompleto.Contains(filtroNombre, StringComparison.OrdinalIgnoreCase) ||
+             u.Email.Contains(filtroNombre, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(filtroRol) || u.RolNombre == filtroRol) &&
+            (string.IsNullOrEmpty(filtroEstado) || u.Estado == filtroEstado)
+        ).ToList();
+        
+        StateHasChanged();
+    }
+
+    private void MostrarModalInvitar()
+    {
+        mostrarModalInvitar = true;
+        emailInvitacion = string.Empty;
+        mensajeInvitacion = string.Empty;
+    }
+
+    private void CerrarModalInvitar()
+    {
+        mostrarModalInvitar = false;
+    }
+
+    private async Task EnviarInvitacion()
+    {
+        if (string.IsNullOrEmpty(emailInvitacion) || enviandoInvitacion)
+            return;
+
+        enviandoInvitacion = true;
+        try
+        {
+            var invitacion = await UsuarioService.InvitarUsuarioAsync(emailInvitacion, mensajeInvitacion);
+            if (invitacion != null)
+            {
+                ToastService.ShowSuccess($"Invitación #{invitacion.IdInvitacion} enviada exitosamente a {emailInvitacion}");
+                CerrarModalInvitar();
+                
+                // Copiar URL al portapapeles
+                await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", invitacion.UrlRegistro);
+                ToastService.ShowInfo($"URL de registro copiada al portapapeles (Código: {invitacion.CodigoInvitacion})");
+            }
+            else
+            {
+                ToastService.ShowError("Error al enviar la invitación");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error: " + ex.Message);
+        }
+        finally
+        {
+            enviandoInvitacion = false;
+        }
+    }
+
+    private async Task VerDetalleUsuario(int idUsuario)
+    {
+        try
+        {
+            usuarioDetalle = await UsuarioService.GetDetalleUsuarioAsync(idUsuario);
+            if (usuarioDetalle != null)
+            {
+                mostrarModalDetalle = true;
+            }
+            else
+            {
+                ToastService.ShowError("No se pudo cargar el detalle del usuario");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error: " + ex.Message);
+        }
+    }
+
+    private void CerrarModalDetalle()
+    {
+        mostrarModalDetalle = false;
+        usuarioDetalle = null;
+    }
+
+    private async Task CambiarRolUsuario(UsuarioDashboard usuario)
+    {
+        usuarioEditandoRol = usuario;
+        rolSeleccionado = 0;
+        await CargarRoles();
+        mostrarModalCambiarRol = true;
+        StateHasChanged();
+    }
+
+    private async Task CargarRoles()
+    {
+        if (cargandoRoles) return;
+        
+        cargandoRoles = true;
+        try
+        {
+            rolesDisponibles = await UsuarioService.GetRolesDisponiblesAsync();
+            
+            // Pre-seleccionar el rol actual del usuario
+            if (usuarioEditandoRol != null && rolesDisponibles.Any())
+            {
+                var rolActual = rolesDisponibles.FirstOrDefault(r => r.Nombre == usuarioEditandoRol.RolNombre);
+                rolSeleccionado = rolActual?.IdRol ?? 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error al cargar roles: {ex.Message}");
+        }
+        finally
+        {
+            cargandoRoles = false;
+        }
+    }
+
+    private void CerrarModalCambiarRol()
+    {
+        mostrarModalCambiarRol = false;
+        usuarioEditandoRol = null;
+        rolSeleccionado = 0;
+    }
+
+    private async Task ConfirmarCambioRol()
+    {
+        if (usuarioEditandoRol == null || rolSeleccionado == 0 || cambiandoRol)
+            return;
+
+        var rolNuevo = rolesDisponibles.FirstOrDefault(r => r.IdRol == rolSeleccionado);
+        if (rolNuevo == null) return;
+
+        cambiandoRol = true;
+        try
+        {
+            var success = await UsuarioService.CambiarRolUsuarioAsync(usuarioEditandoRol.IdUsuario, rolSeleccionado);
+            
+            if (success)
+            {
+                // Actualizar el usuario en la lista local
+                usuarioEditandoRol.RolNombre = rolNuevo.Nombre;
+                
+                ToastService.ShowSuccess($"Rol de {usuarioEditandoRol.NombreCompleto} cambiado a {GetRolDisplayName(rolNuevo.Nombre)}");
+                CerrarModalCambiarRol();
+                StateHasChanged();
+            }
+            else
+            {
+                ToastService.ShowError("Error al cambiar el rol del usuario");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error: {ex.Message}");
+        }
+        finally
+        {
+            cambiandoRol = false;
+        }
+    }
+
+    // Modal de confirmación personalizado
+    private void MostrarConfirmacion(string titulo, string mensaje, string tipo, Func<Task> accion)
+    {
+        tituloConfirmacion = titulo;
+        mensajeConfirmacion = mensaje;
+        tipoConfirmacion = tipo;
+        accionConfirmacion = accion;
+        mostrarModalConfirmacion = true;
+        StateHasChanged();
+    }
+
+    private void CerrarModalConfirmacion()
+    {
+        mostrarModalConfirmacion = false;
+        accionConfirmacion = null;
+        ejecutandoAccion = false;
+    }
+
+    private async Task EjecutarAccionConfirmacion()
+    {
+        if (accionConfirmacion == null || ejecutandoAccion)
+            return;
+
+        ejecutandoAccion = true;
+        try
+        {
+            await accionConfirmacion();
+            CerrarModalConfirmacion();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error: {ex.Message}");
+        }
+        finally
+        {
+            ejecutandoAccion = false;
+        }
+    }
+
+    private async Task CambiarEstadoUsuario(UsuarioDashboard usuario)
+    {
+        var nuevoEstado = usuario.Estado == "activo" ? "suspendido" : "activo";
+        var accion = nuevoEstado == "activo" ? "activar" : "suspender";
+        var titulo = $"{char.ToUpper(accion[0])}{accion.Substring(1)} Usuario";
+        var mensaje = $"¿Estás seguro que deseas {accion} a <strong>{usuario.NombreCompleto}</strong>?";
+        var tipo = nuevoEstado == "activo" ? "success" : "warning";
+
+        MostrarConfirmacion(titulo, mensaje, tipo, async () =>
+        {
+            var success = await UsuarioService.CambiarEstadoUsuarioAsync(usuario.IdUsuario, nuevoEstado);
+            if (success)
+            {
+                usuario.Estado = nuevoEstado;
+                ToastService.ShowSuccess($"Usuario {accion}do exitosamente");
+                StateHasChanged();
+            }
+            else
+            {
+                ToastService.ShowError("Error al cambiar el estado del usuario");
+            }
+        });
+    }
+
+    private string GetInitials(string nombreCompleto)
+    {
+        if (string.IsNullOrEmpty(nombreCompleto))
+            return "U";
+            
+        var parts = nombreCompleto.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return parts[0][0].ToString().ToUpper();
+    }
+
+    private string GetRolClass(string rol) => rol switch
+    {
+        "super_admin" => "super-admin",
+        "admin_liga" => "admin",
+        "admin_equipo" => "admin",
+        "arbitro" => "arbitro",
+        "consulta" => "consulta",
+        _ => "consulta"
+    };
+
+    private string GetRolDisplayName(string rol) => rol switch
+    {
+        "super_admin" => "Super Admin",
+        "admin_liga" => "Admin Liga",
+        "admin_equipo" => "Admin Equipo",
+        "arbitro" => "Árbitro",
+        "consulta" => "Consulta",
+        _ => "Usuario"
+    };
+}

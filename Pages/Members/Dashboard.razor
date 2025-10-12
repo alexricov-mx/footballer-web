@@ -5,6 +5,7 @@
 @inject IJSRuntime JSRuntime
 @inject IAuthService AuthService
 @inject IJwtClientService JwtClientService
+@inject UsuarioService UsuarioService
 @inject NavigationManager Navigation
 
 <AuthGuard>
@@ -116,10 +117,63 @@
                                             <i class="oi oi-calendar"></i> Ver Calendario
                                         </a>
                                     </div>
-                                    <div class="col-md-3 mb-2">
-                                        <a href="#" class="btn btn-outline-primary w-100">
-                                            <i class="oi oi-bar-chart"></i> Estadísticas
-                                        </a>
+                                    @if (userRole == "super_admin" || userRole == "admin")
+                                    {
+                                        <div class="col-md-3 mb-2">
+                                            <a href="/members/usuarios" class="btn btn-outline-warning w-100">
+                                                <i class="oi oi-person"></i> Gestionar Usuarios
+                                            </a>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="col-md-3 mb-2">
+                                            <a href="#" class="btn btn-outline-primary w-100">
+                                                <i class="oi oi-bar-chart"></i> Estadísticas
+                                            </a>
+                                        </div>
+                                    }
+                                </div>
+                                
+                                <!-- Debug completo temporalmente -->
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <div class="card border-warning">
+                                            <div class="card-header bg-warning text-dark">
+                                                <h6 class="mb-0">🔍 Debug - Información de Rol del Usuario</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-md-6">
+                                                        <strong>Rol encontrado:</strong> '@userRole'<br>
+                                                        <strong>Es admin?</strong> @(userRole == "super_admin" || userRole == "admin" ? "Sí" : "No")<br>
+                                                        <strong>Token encontrado?</strong> @(debugTokenFound ? "Sí" : "No")<br>
+                                                        <strong>Token key usado:</strong> @debugTokenKey<br>
+                                                        <strong>UserInfo encontrado?</strong> @(debugUserInfoFound ? "Sí" : "No")
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <strong>Claims encontrados:</strong><br>
+                                                        @if (debugClaimsFound.Any())
+                                                        {
+                                                            @foreach(var claim in debugClaimsFound)
+                                                            {
+                                                                <small>@claim</small><br>
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            <small class="text-muted">No hay claims</small>
+                                                        }
+                                                    </div>
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(debugUserInfoContent))
+                                                {
+                                                    <hr>
+                                                    <strong>UserInfo completo:</strong><br>
+                                                    <code>@debugUserInfoContent</code>
+                                                }
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -351,12 +405,20 @@
 @code {
     private string userName = string.Empty;
     private string userEmail = string.Empty;
+    private string userRole = string.Empty;
     private string tokenExpiration = string.Empty;
     private string tokenIssuer = string.Empty;
     private string tokenAudience = string.Empty;
     private string tokenExpirationDate = string.Empty;
     private Dictionary<string, string> userClaims = new();
     private bool showAllClaims = false;
+
+    // Debug variables
+    private bool debugTokenFound = false;
+    private string debugTokenKey = string.Empty;
+    private bool debugUserInfoFound = false;
+    private List<string> debugClaimsFound = new();
+    private string debugUserInfoContent = string.Empty;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -371,14 +433,124 @@
     {
         try
         {
-            // Get JWT token from localStorage (AuthenticatedRoute ensures it exists and is valid)
-            var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "jwt_token");
+            // Reset debug info
+            debugTokenFound = false;
+            debugTokenKey = string.Empty;
+            debugUserInfoFound = false;
+            debugClaimsFound.Clear();
+            debugUserInfoContent = string.Empty;
+
+            // Try different token keys
+            string? token = null;
+            
+            var jwtToken = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "jwt_token");
+            if (!string.IsNullOrEmpty(jwtToken))
+            {
+                token = jwtToken;
+                debugTokenKey = "jwt_token";
+            }
+            else
+            {
+                var authToken = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+                if (!string.IsNullOrEmpty(authToken))
+                {
+                    token = authToken;
+                    debugTokenKey = "authToken";
+                }
+                else
+                {
+                    var basicToken = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "token");
+                    if (!string.IsNullOrEmpty(basicToken))
+                    {
+                        token = basicToken;
+                        debugTokenKey = "token";
+                    }
+                }
+            }
+            
+            debugTokenFound = !string.IsNullOrEmpty(token);
             
             if (!string.IsNullOrEmpty(token))
             {
                 // Get user info from token
                 userName = JwtClientService.GetUserNameFromToken(token) ?? "Usuario";
                 userEmail = JwtClientService.GetUserEmailFromToken(token) ?? "";
+                
+                // Get user role from claims - try multiple claim names
+                var claims = JwtClientService.GetClaimsFromToken(token);
+                
+                // Debug: recopilar todos los claims disponibles
+                if (claims != null)
+                {
+                    foreach (var claim in claims.Claims)
+                    {
+                        debugClaimsFound.Add($"{claim.Type}: {claim.Value}");
+                    }
+                }
+                
+                // Primero intentar obtener el rol de los claims JWT
+                userRole = claims?.FindFirst("role")?.Value ?? 
+                          claims?.FindFirst("http://schemas.microsoft.com/ws/2008/06/identity/claims/role")?.Value ??
+                          claims?.FindFirst("roles")?.Value ??
+                          claims?.FindFirst("user_role")?.Value ?? "";
+                
+                // Si no hay rol en el JWT, obtenerlo desde la base de datos usando el email
+                if (string.IsNullOrEmpty(userRole) && !string.IsNullOrEmpty(userEmail))
+                {
+                    debugClaimsFound.Add($"attempting_db_role_lookup_for: {userEmail}");
+                    try
+                    {
+                        var roleFromDb = await UsuarioService.GetUserRoleByEmailAsync(userEmail);
+                        debugClaimsFound.Add($"db_role_response: {roleFromDb ?? "null"}");
+                        if (!string.IsNullOrEmpty(roleFromDb))
+                        {
+                            userRole = roleFromDb;
+                            debugClaimsFound.Add($"role_from_db_success: {roleFromDb}");
+                        }
+                        else
+                        {
+                            debugClaimsFound.Add("db_role_empty_or_null");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        debugClaimsFound.Add($"error_getting_role: {ex.Message}");
+                        debugClaimsFound.Add($"error_type: {ex.GetType().Name}");
+                    }
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(userRole))
+                    {
+                        debugClaimsFound.Add($"role_found_in_jwt: {userRole}");
+                    }
+                    if (string.IsNullOrEmpty(userEmail))
+                    {
+                        debugClaimsFound.Add("no_email_found_for_db_lookup");
+                    }
+                }
+                
+                // For testing, let's also check user info from localStorage
+                var userInfo = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "userInfo");
+                debugUserInfoFound = !string.IsNullOrEmpty(userInfo);
+                
+                if (!string.IsNullOrEmpty(userInfo))
+                {
+                    debugUserInfoContent = userInfo;
+                    
+                    if (string.IsNullOrEmpty(userRole))
+                    {
+                        try
+                        {
+                            var userObj = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(userInfo);
+                            if (userObj != null && userObj.ContainsKey("rol"))
+                            {
+                                userRole = userObj["rol"].ToString() ?? "";
+                            }
+                        }
+                        catch { /* ignore parsing errors */ }
+                    }
+                }
                 
                 // Get all token information
                 var expirationDate = JwtClientService.GetTokenExpirationDate(token);

@@ -89,7 +89,10 @@ namespace FootballerWeb.Services
             try
             {
                 var claims = GetClaimsFromToken(token);
-                return claims?.FindFirst(ClaimTypes.Email)?.Value;
+                // Try multiple email claim types
+                return claims?.FindFirst(ClaimTypes.Email)?.Value ??
+                       claims?.FindFirst("email")?.Value ??
+                       claims?.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
             }
             catch (Exception ex)
             {
@@ -103,7 +106,11 @@ namespace FootballerWeb.Services
             try
             {
                 var claims = GetClaimsFromToken(token);
-                return claims?.FindFirst(ClaimTypes.Name)?.Value;
+                // Try multiple name claim types
+                return claims?.FindFirst(ClaimTypes.Name)?.Value ??
+                       claims?.FindFirst("name")?.Value ??
+                       claims?.FindFirst("given_name")?.Value ??
+                       claims?.FindFirst("unique_name")?.Value;
             }
             catch (Exception ex)
             {

@@ -9,33 +9,64 @@
 
 <div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
     <nav class="flex-column">
+        <!-- Inicio (siempre visible) -->
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
                 <span class="oi oi-home" aria-hidden="true"></span> Inicio
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="about">
-                <span class="oi oi-info" aria-hidden="true"></span> Acerca de
-            </NavLink>
-        </div>
         
         @if (isAuthenticated)
         {
+            <!-- Panel Inicio (solo para usuarios autenticados) -->
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="members/home">
+                    <span class="oi oi-target" aria-hidden="true"></span> Panel Inicio
+                </NavLink>
+            </div>
+            
+            <!-- Dashboard -->
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="members/dashboard">
                     <span class="oi oi-dashboard" aria-hidden="true"></span> Dashboard
                 </NavLink>
             </div>
+            
+            <!-- Gestión de Usuarios (solo para super_admin y admin) -->
+            @if (userRole == "super_admin" || userRole == "admin")
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="members/usuarios">
+                        <span class="oi oi-people" aria-hidden="true"></span> Usuarios
+                    </NavLink>
+                </div>
+            }
+            
+            <!-- Acerca de -->
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="about">
+                    <span class="oi oi-info" aria-hidden="true"></span> Acerca de
+                </NavLink>
+            </div>
+            
+            <!-- Cerrar Sesión -->
             <div class="nav-item px-3">
                 <LogoutButton CssClass="nav-link" ButtonText="Cerrar Sesión" ShowConfirmation="false" />
             </div>
         }
         else
         {
+            <!-- Iniciar Sesión (solo para usuarios no autenticados) -->
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="auth/simple-login">
                     <span class="oi oi-account-login" aria-hidden="true"></span> Iniciar Sesión
+                </NavLink>
+            </div>
+            
+            <!-- Acerca de (para usuarios no autenticados) -->
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="about">
+                    <span class="oi oi-info" aria-hidden="true"></span> Acerca de
                 </NavLink>
             </div>
         }
@@ -49,6 +80,7 @@
 @code {
     private bool collapseNavMenu = true;
     private bool isAuthenticated = false;
+    private string? userRole = null;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
@@ -66,11 +98,31 @@
         {
             var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
             isAuthenticated = !string.IsNullOrEmpty(token);
+            
+            if (isAuthenticated)
+            {
+                // Obtener el rol del token JWT
+                var userInfo = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "userInfo");
+                if (!string.IsNullOrEmpty(userInfo))
+                {
+                    try
+                    {
+                        var user = System.Text.Json.JsonSerializer.Deserialize<dynamic>(userInfo);
+                        userRole = user?.GetProperty("rol").GetString();
+                    }
+                    catch
+                    {
+                        userRole = null;
+                    }
+                }
+            }
+            
             StateHasChanged();
         }
         catch (Exception)
         {
             isAuthenticated = false;
+            userRole = null;
             StateHasChanged();
         }
     }

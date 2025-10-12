@@ -16,6 +16,7 @@ builder.Services.AddScoped<IJwtClientService, JwtClientService>();
 builder.Services.AddScoped<IAuthStateService, AuthStateService>();
 builder.Services.AddScoped<IMemberService, MemberService>();
 builder.Services.AddScoped<IContentService, ContentService>();
+builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<ToastService>();
 
 // HttpClient para componentes Blazor
