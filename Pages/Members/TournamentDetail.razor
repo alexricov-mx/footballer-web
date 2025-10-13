@@ -461,13 +461,13 @@
         try
         {
             // Convertir equipos a formato DTO para enviar al backend
-            var asignaciones = new List<FootballerWeb.Services.AsignacionEquipoDto>();
+            var asignaciones = new List<FootballerWeb.Services.AsignacionUsuarioEquipoDto>();
             
             foreach (var equipo in equipos)
             {
                 foreach (var usuario in equipo.Usuarios)
                 {
-                    asignaciones.Add(new FootballerWeb.Services.AsignacionEquipoDto
+                    asignaciones.Add(new FootballerWeb.Services.AsignacionUsuarioEquipoDto
                     {
                         IdUsuario = usuario.IdUsuario,
                         NombreUsuario = usuario.Nombre,

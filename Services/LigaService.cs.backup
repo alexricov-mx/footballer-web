@@ -374,6 +374,36 @@ public class LigaService
         var asignacionesNuevoFormato = ConvertirAsignacionesANuevoFormato(asignacionesAnteriores);
         await GuardarAsignacionesEquiposAsync(idLiga, asignacionesNuevoFormato);
     }
+    {
+        try
+        {
+            var token = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+            if (string.IsNullOrEmpty(token))
+                return new List<AsignacionEquipoDto>();
+
+            _httpClient.DefaultRequestHeaders.Authorization = 
+                new AuthenticationHeaderValue("Bearer", token);
+
+            var response = await _httpClient.GetAsync($"https://localhost:8090/api/ligas/{idLiga}/asignaciones-equipos");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var equiposAsignaciones = JsonSerializer.Deserialize<List<AsignacionEquipoDto>>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                return equiposAsignaciones ?? new List<AsignacionEquipoDto>();
+            }
+
+            return new List<AsignacionEquipoDto>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al obtener asignaciones nuevo formato: {ex.Message}");
+            return new List<AsignacionEquipoDto>();
+        }
+    }
 
     public async Task GuardarAsignacionesEquiposAsync(int idLiga, List<AsignacionEquipoDto> asignaciones)
     {

@@ -87,6 +87,16 @@
                                 <div class="card-body">
                                     @if (usuariosSinAsignar.Any())
                                     {
+                                        @* Alerta si hay usuarios sin asignar pero todos los equipos están ocupados *@
+                                        @if (TodosLosEquiposOcupados && usuariosSinAsignar.Any())
+                                        {
+                                            <div class="alert alert-warning mb-3">
+                                                <i class="oi oi-warning me-2"></i>
+                                                <strong>¡Atención!</strong> Todos los equipos (@cantidadEquipos) están ocupados, pero hay @usuariosSinAsignar.Count usuario@(usuariosSinAsignar.Count == 1 ? "" : "s") sin asignar. 
+                                                Para asignar más usuarios, primero debes remover a alguien de un equipo existente.
+                                            </div>
+                                        }
+                                        
                                         <div class="row">
                                             @foreach (var usuario in usuariosSinAsignar)
                                             {
@@ -103,10 +113,12 @@
                                                                     @for (int i = 1; i <= cantidadEquipos; i++)
                                                                     {
                                                                         var equipoNum = i;
-                                                                        <button class="btn btn-outline-primary btn-sm mb-1" 
+                                                                        var equipoOcupado = asignaciones.Any(a => a.NumeroEquipo == equipoNum);
+                                                                        <button class="btn @(equipoOcupado ? "btn-outline-warning" : "btn-outline-primary") btn-sm mb-1" 
                                                                                 @onclick="() => AsignarUsuarioAEquipo(usuario.IdUsuario, equipoNum)"
-                                                                                @onclick:preventDefault="true">
-                                                                            Equipo @equipoNum
+                                                                                @onclick:preventDefault="true"
+                                                                                title="@(equipoOcupado ? "Equipo ocupado - reemplazará al usuario actual" : "Equipo disponible")">
+                                                                            Equipo @equipoNum @(equipoOcupado ? "⚠️" : "")
                                                                         </button>
                                                                     }
                                                                 </div>
@@ -119,7 +131,10 @@
                                     }
                                     else
                                     {
-                                        <p class="text-muted mb-0">Todos los usuarios han sido asignados a equipos.</p>
+                                        <p class="text-success mb-0">
+                                            <i class="oi oi-check me-2"></i>
+                                            Todos los usuarios han sido asignados a equipos.
+                                        </p>
                                     }
                                 </div>
                             </div>
@@ -218,6 +233,10 @@
     // Usuarios sin asignar (computed)
     private List<UsuarioSimple> usuariosSinAsignar => 
         usuariosDisponibles.Where(u => !asignaciones.Any(a => a.IdUsuario == u.IdUsuario)).ToList();
+    
+    // Verifica si todos los equipos están ocupados
+    private bool TodosLosEquiposOcupados => 
+        asignaciones.Select(a => a.NumeroEquipo).Distinct().Count() >= cantidadEquipos;
 
     protected override async Task OnInitializedAsync()
     {
@@ -376,26 +395,53 @@
         guardando = true;
         try
         {
-            // Convertir a DTOs para enviar al backend
-            var asignacionesDto = asignaciones.Select(a => new FootballerWeb.Services.AsignacionEquipoDto
+            // Verificar que hay asignaciones para guardar
+            if (!asignaciones.Any())
             {
-                IdUsuario = a.IdUsuario,
-                NombreUsuario = a.NombreUsuario,
-                EmailUsuario = a.EmailUsuario,
-                NumeroEquipo = a.NumeroEquipo
-            }).ToList();
+                ToastService.ShowWarning("No hay asignaciones para guardar");
+                return;
+            }
+
+            Console.WriteLine($"DEBUG: Guardando {asignaciones.Count} asignaciones para torneo {IdTorneo}");
+
+            // Convertir a DTOs para enviar al backend - USANDO EL NUEVO FORMATO
+            var asignacionesDto = new List<FootballerWeb.Services.AsignacionEquipoDto>();
+            
+            // Agrupar por equipo (según el nuevo formato de la API)
+            var equiposConUsuarios = asignaciones.GroupBy(a => a.NumeroEquipo).ToList();
+            
+            foreach (var grupoEquipo in equiposConUsuarios)
+            {
+                var equipoDto = new FootballerWeb.Services.AsignacionEquipoDto
+                {
+                    IdEquipo = grupoEquipo.Key, // Usamos el número de equipo como ID temporalmente
+                    NombreEquipo = $"Equipo {grupoEquipo.Key}",
+                    Usuarios = grupoEquipo.Select(a => new FootballerWeb.Services.UsuarioAsignadoDto
+                    {
+                        IdUsuario = a.IdUsuario,
+                        Nombre = a.NombreUsuario.Split(' ').FirstOrDefault() ?? "",
+                        Apellidos = string.Join(" ", a.NombreUsuario.Split(' ').Skip(1)),
+                        Email = a.EmailUsuario,
+                        Posicion = "jugador"
+                    }).ToList()
+                };
+                asignacionesDto.Add(equipoDto);
+            }
+
+            Console.WriteLine($"DEBUG: Enviando {asignacionesDto.Count} equipos con asignaciones");
 
             await LigaService.GuardarAsignacionesEquiposAsync(IdTorneo, asignacionesDto);
             
             ToastService.ShowSuccess("Asignaciones guardadas correctamente");
             
-            // Opcional: regresar a la página anterior
-            await Task.Delay(1000);
-            Volver();
+            // Redirigir a my-tournaments después de guardar
+            await Task.Delay(1500);
+            Navigation.NavigateTo("/members/my-tournaments");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error guardando asignaciones: {ex.Message}");
+            Console.WriteLine($"ERROR guardando asignaciones: {ex.Message}");
+            Console.WriteLine($"StackTrace: {ex.StackTrace}");
             ToastService.ShowError("Error al guardar asignaciones: " + ex.Message);
         }
         finally
@@ -406,7 +452,7 @@
 
     private void Volver()
     {
-        Navigation.NavigateTo("/members/my-tournaments-playing");
+        Navigation.NavigateTo("/members/my-tournaments");
     }
 
     // Clases auxiliares
