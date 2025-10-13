@@ -1,7 +1,12 @@
 @page "/members/create-tournament"
 @using FootballerWeb.Services
 @using FootballerWeb.Shared.Components
+@using FootballerWeb.DTOs
 @inject NavigationManager Navigation
+@inject LigaService LigaService
+@inject EquipoService EquipoService
+@inject ToastService ToastService
+@inject IJSRuntime JSRuntime
 
 <AuthGuard>
     <div class="container-fluid mt-4">
@@ -23,45 +28,511 @@
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body text-center py-5">
-                        <i class="oi oi-info display-1 text-success mb-3"></i>
-                        <h3>Próximamente disponible</h3>
-                        <p class="text-muted mb-4">Esta sección estará disponible muy pronto. Aquí podrás:</p>
-                        <ul class="list-unstyled">
-                            <li class="mb-2">
-                                <i class="oi oi-check text-success me-2"></i>
-                                Crear torneos completamente personalizados
-                            </li>
-                            <li class="mb-2">
-                                <i class="oi oi-check text-success me-2"></i>
-                                Configurar sistema de puntuación
-                            </li>
-                            <li class="mb-2">
-                                <i class="oi oi-check text-success me-2"></i>
-                                Gestionar equipos participantes
-                            </li>
-                            <li class="mb-2">
-                                <i class="oi oi-check text-success me-2"></i>
-                                Generar calendario automático de partidos
-                            </li>
-                        </ul>
-                        <button class="btn btn-success mt-3" @onclick="BackToHome">
-                            <i class="oi oi-home me-2"></i>
-                            Volver al Inicio
-                        </button>
+        @if (!ligaCreada)
+        {
+            <!-- Formulario de creación de liga -->
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title mb-0">
+                                <i class="oi oi-list-rich me-2"></i>Información del Torneo
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <form @onsubmit="CrearLiga" @onsubmit:preventDefault="true">
+                                <div class="row">
+                                    <div class="col-md-8 mb-3">
+                                        <label for="nombreLiga" class="form-label">Nombre del Torneo/Liga *</label>
+                                        <input type="text" class="form-control" id="nombreLiga" 
+                                               @bind="nuevaLiga.Nombre" @bind:event="oninput"
+                                               placeholder="Ej: Liga de Verano 2025" 
+                                               required maxlength="100" />
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label for="estatusLiga" class="form-label">Estado Inicial</label>
+                                        <select class="form-select" id="estatusLiga" @bind="nuevaLiga.Estatus">
+                                            <option value="abierta">Abierta (Puede recibir equipos)</option>
+                                            <option value="cerrada">Cerrada (Solo equipos invitados)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="descripcionLiga" class="form-label">Descripción (Opcional)</label>
+                                    <textarea class="form-control" id="descripcionLiga" rows="3"
+                                              @bind="nuevaLiga.Descripcion"
+                                              placeholder="Describe las características de tu torneo, reglas especiales, premiación, etc."
+                                              maxlength="500"></textarea>
+                                    <div class="form-text">Máximo 500 caracteres</div>
+                                </div>
+
+                                <!-- Sección de Equipos Disponibles -->
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div>
+                                            <label class="form-label mb-0">Equipos Disponibles</label>
+                                            <div class="form-text">Selecciona los equipos que participarán en este torneo</div>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="CargarEquipos">
+                                            <i class="oi oi-reload me-1"></i>Actualizar
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-success" @onclick="CrearEquipoPrueba">
+                                            <i class="oi oi-plus me-1"></i>Crear Equipo de Prueba
+                                        </button>
+                                    </div>
+                                    
+                                    @if (cargandoEquipos)
+                                    {
+                                        <div class="text-center py-3">
+                                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                            <span>Cargando equipos...</span>
+                                        </div>
+                                    }
+                                    else if (equiposDisponibles?.Any() == true)
+                                    {
+                                        <div class="row">
+                                            @foreach (var equipo in equiposDisponibles)
+                                            {
+                                                <div class="col-md-6 col-lg-4 mb-2">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" 
+                                                               id="equipo_@equipo.IdEquipo"
+                                                               @bind="equipo.Seleccionado" />
+                                                        <label class="form-check-label" for="equipo_@equipo.IdEquipo">
+                                                            @equipo.Nombre
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="form-text mt-2">
+                                            <i class="oi oi-info me-1"></i>
+                                            Equipos seleccionados: @equiposDisponibles.Count(e => e.Seleccionado)
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="alert alert-info" role="alert">
+                                            <i class="oi oi-info me-2"></i>
+                                            No tienes equipos creados aún. Puedes agregar equipos después de crear el torneo.
+                                            <br />
+                                            <small class="text-muted">
+                                                Debug: Equipos cargados = @(equiposDisponibles?.Count ?? -1)
+                                            </small>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="fechaInicio" class="form-label">Fecha de Inicio (Opcional)</label>
+                                        <input type="date" class="form-control" id="fechaInicio" 
+                                               @bind="nuevaLiga.FechaInicio" />
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="fechaFin" class="form-label">Fecha de Fin (Tentativa)</label>
+                                        <input type="date" class="form-control" id="fechaFin" 
+                                               @bind="nuevaLiga.FechaFin" />
+                                        <div class="form-text">La fecha final se calculará automáticamente según el número de equipos y jornadas</div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-3 mt-4">
+                                    <button type="submit" class="btn btn-success" 
+                                            disabled="@(creandoLiga || string.IsNullOrWhiteSpace(nuevaLiga.Nombre))">
+                                        @if (creandoLiga)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="oi oi-plus me-1"></i>
+                                        }
+                                        Crear Torneo
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" @onclick="BackToHome">
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Liga creada exitosamente - mostrar opciones -->
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                            <h3 class="card-title mb-0">
+                                <i class="oi oi-circle-check me-2"></i>¡Torneo Creado Exitosamente!
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-success" role="alert">
+                                <h4 class="alert-heading">¡Felicidades!</h4>
+                                <p>Tu torneo <strong>"@ligaCreatedData?.Nombre"</strong> ha sido creado correctamente.</p>
+                                <hr>
+                                <p class="mb-0">¿Qué quieres hacer ahora?</p>
+                            </div>
+
+                            <div class="row mt-4">
+                                <!-- Opción 1: Invitar Jugadores -->
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100 border-primary">
+                                        <div class="card-body text-center">
+                                            <i class="oi oi-person display-4 text-primary mb-3"></i>
+                                            <h5>Invitar Jugadores</h5>
+                                            <p class="text-muted small">Invita jugadores por email para que se unan a tu torneo</p>
+                                            <button class="btn btn-primary w-100" @onclick="MostrarModalInvitacion">
+                                                <i class="oi oi-envelope-closed me-1"></i>
+                                                Enviar Invitaciones
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Opción 2: Ver Torneo -->
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100 border-info">
+                                        <div class="card-body text-center">
+                                            <i class="oi oi-eye display-4 text-info mb-3"></i>
+                                            <h5>Ver Mi Torneo</h5>
+                                            <p class="text-muted small">Ve a la sección de mis torneos para gestionar</p>
+                                            <button class="btn btn-info w-100" @onclick="IrAMisTorneos">
+                                                <i class="oi oi-list-rich me-1"></i>
+                                                Ver Mis Torneos
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <button class="btn btn-outline-secondary" @onclick="CrearOtroTorneo">
+                                    <i class="oi oi-plus me-1"></i>
+                                    Crear Otro Torneo
+                                </button>
+                                <button class="btn btn-outline-primary ms-2" @onclick="BackToHome">
+                                    <i class="oi oi-home me-1"></i>
+                                    Volver al Inicio
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Modal de Invitación -->
+    @if (mostrarModalInvitacion && ligaCreatedData != null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="oi oi-person me-2"></i>Invitar Jugadores - @ligaCreatedData.Nombre
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="CerrarModalInvitacion"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Formulario de invitación -->
+                        <div class="row mb-4">
+                            <div class="col-md-8">
+                                <label for="emailInvitado" class="form-label">Email del jugador</label>
+                                <input type="email" class="form-control" id="emailInvitado" 
+                                       @bind="emailInvitado" @bind:event="oninput"
+                                       placeholder="ejemplo@correo.com" />
+                            </div>
+                            <div class="col-md-4">
+                                <label for="tipoInvitacion" class="form-label">Tipo</label>
+                                <select class="form-select" id="tipoInvitacion" @bind="tipoInvitacion">
+                                    <option value="jugador">Jugador</option>
+                                    <option value="admin_liga">Admin Liga</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="mensajePersonalizado" class="form-label">Mensaje personal (opcional)</label>
+                            <textarea class="form-control" id="mensajePersonalizado" rows="3" 
+                                      @bind="mensajePersonalizado"
+                                      placeholder="¡Hola! Te invito a participar en mi torneo de fútbol..."></textarea>
+                        </div>
+
+                        <div class="d-flex gap-2 mb-4">
+                            <button class="btn btn-success" @onclick="EnviarInvitacion" 
+                                    disabled="@(procesandoInvitacion || string.IsNullOrWhiteSpace(emailInvitado))">
+                                @if (procesandoInvitacion)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                else
+                                {
+                                    <i class="oi oi-envelope-closed me-1"></i>
+                                }
+                                Enviar Invitación
+                            </button>
+                            <button class="btn btn-secondary" @onclick="CerrarModalInvitacion">Cerrar</button>
+                        </div>
+
+                        <!-- Lista de invitaciones enviadas -->
+                        @if (invitacionesEnviadas.Any())
+                        {
+                            <hr />
+                            <h6><i class="oi oi-list-rich me-1"></i>Invitaciones Enviadas (@invitacionesEnviadas.Count)</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Email</th>
+                                            <th>Tipo</th>
+                                            <th>Código</th>
+                                            <th>Fecha</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var inv in invitacionesEnviadas)
+                                        {
+                                            <tr>
+                                                <td>@inv.EmailInvitado</td>
+                                                <td><span class="badge bg-secondary">@inv.TipoInvitacion</span></td>
+                                                <td><code>@inv.CodigoInvitacion</code></td>
+                                                <td>@DateTime.Now.ToString("dd/MM/yyyy HH:mm")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    }
 </AuthGuard>
 
 @code {
+    // Estados del componente
+    private bool ligaCreada = false;
+    private bool creandoLiga = false;
+    private Liga? ligaCreatedData = null;
+
+    // Formulario de nueva liga
+    private NuevaLigaModel nuevaLiga = new();
+    
+    // Modal de invitación
+    private bool mostrarModalInvitacion = false;
+    private string emailInvitado = string.Empty;
+    private string tipoInvitacion = "jugador";
+    private string mensajePersonalizado = string.Empty;
+    private bool procesandoInvitacion = false;
+    private List<InvitacionLigaResponse> invitacionesEnviadas = new();
+    
+    // Equipos disponibles
+    private List<Equipo>? equiposDisponibles;
+    private bool cargandoEquipos = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarEquipos();
+    }
+
+    private async Task CargarEquipos()
+    {
+        cargandoEquipos = true;
+        StateHasChanged();
+        
+        try
+        {
+            Console.WriteLine("DEBUG: Iniciando carga de equipos...");
+            equiposDisponibles = await EquipoService.GetEquiposPorUsuarioAsync() ?? new List<Equipo>();
+            Console.WriteLine($"DEBUG: Equipos cargados: {equiposDisponibles.Count}");
+            ToastService.ShowInfo($"Debug: Se cargaron {equiposDisponibles.Count} equipos");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DEBUG: Error al cargar equipos: {ex.Message}");
+            ToastService.ShowError("Error al cargar equipos: " + ex.Message);
+            equiposDisponibles = new List<Equipo>();
+        }
+        finally
+        {
+            cargandoEquipos = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CrearEquipoPrueba()
+    {
+        try
+        {
+            var equipoCreado = await EquipoService.CrearEquipoAsync($"Equipo Prueba {DateTime.Now:HHmm}");
+            if (equipoCreado != null)
+            {
+                ToastService.ShowSuccess($"Equipo creado: {equipoCreado.Nombre}");
+                await CargarEquipos(); // Recargar lista
+            }
+            else
+            {
+                ToastService.ShowError("Error al crear equipo de prueba");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al crear equipo: " + ex.Message);
+        }
+    }
+
+    private async Task CrearLiga()
+    {
+        if (string.IsNullOrWhiteSpace(nuevaLiga.Nombre))
+            return;
+
+        creandoLiga = true;
+        StateHasChanged();
+
+        try
+        {
+            // Llamar al API para crear la liga
+            ligaCreatedData = await LigaService.CrearLigaAsync(
+                nuevaLiga.Nombre.Trim(),
+                nuevaLiga.Descripcion?.Trim(),
+                nuevaLiga.Estatus ?? "abierta",
+                nuevaLiga.FechaInicio,
+                nuevaLiga.FechaFin
+            );
+
+            if (ligaCreatedData != null)
+            {
+                // Asignar equipos seleccionados a la liga
+                var equiposSeleccionados = equiposDisponibles?.Where(e => e.Seleccionado).ToList() ?? new List<Equipo>();
+                
+                if (equiposSeleccionados.Any())
+                {
+                    foreach (var equipo in equiposSeleccionados)
+                    {
+                        try
+                        {
+                            await EquipoService.AsignarEquipoALigaAsync(equipo.IdEquipo, ligaCreatedData.IdLiga);
+                        }
+                        catch (Exception ex)
+                        {
+                            ToastService.ShowWarning($"No se pudo asignar el equipo {equipo.Nombre}: {ex.Message}");
+                        }
+                    }
+                }
+
+                ligaCreada = true;
+                ToastService.ShowSuccess($"¡Torneo '{ligaCreatedData.Nombre}' creado exitosamente!");
+            }
+            else
+            {
+                ToastService.ShowError("Error al crear el torneo. Por favor, intenta nuevamente.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al crear el torneo: " + ex.Message);
+        }
+        finally
+        {
+            creandoLiga = false;
+            StateHasChanged();
+        }
+    }
+
+    private void MostrarModalInvitacion()
+    {
+        mostrarModalInvitacion = true;
+        emailInvitado = string.Empty;
+        tipoInvitacion = "jugador";
+        mensajePersonalizado = string.Empty;
+        StateHasChanged();
+    }
+
+    private void CerrarModalInvitacion()
+    {
+        mostrarModalInvitacion = false;
+        StateHasChanged();
+    }
+
+    private async Task EnviarInvitacion()
+    {
+        if (ligaCreatedData == null || string.IsNullOrWhiteSpace(emailInvitado))
+            return;
+
+        procesandoInvitacion = true;
+        StateHasChanged();
+
+        try
+        {
+            var resultado = await LigaService.InvitarUsuarioALigaAsync(
+                ligaCreatedData.IdLiga, 
+                emailInvitado.Trim(), 
+                tipoInvitacion,
+                string.IsNullOrWhiteSpace(mensajePersonalizado) ? null : mensajePersonalizado.Trim()
+            );
+
+            if (resultado != null)
+            {
+                ToastService.ShowSuccess($"Invitación enviada a {emailInvitado}");
+                
+                // Agregar a la lista de enviadas
+                invitacionesEnviadas.Add(resultado);
+                
+                // Limpiar formulario
+                emailInvitado = string.Empty;
+                mensajePersonalizado = string.Empty;
+            }
+            else
+            {
+                ToastService.ShowError("Error al enviar la invitación");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al enviar invitación: " + ex.Message);
+        }
+        finally
+        {
+            procesandoInvitacion = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CrearOtroTorneo()
+    {
+        ligaCreada = false;
+        ligaCreatedData = null;
+        nuevaLiga = new NuevaLigaModel();
+        invitacionesEnviadas.Clear();
+        StateHasChanged();
+    }
+
+    private void IrAMisTorneos()
+    {
+        Navigation.NavigateTo("/members/my-tournaments");
+    }
+
     private void BackToHome()
     {
         Navigation.NavigateTo("/members/home");
+    }
+
+    // Modelo para el formulario
+    public class NuevaLigaModel
+    {
+        public string Nombre { get; set; } = string.Empty;
+        public string? Descripcion { get; set; }
+        public string? Estatus { get; set; } = "abierta";
+        public DateTime? FechaInicio { get; set; }
+        public DateTime? FechaFin { get; set; }
     }
 }

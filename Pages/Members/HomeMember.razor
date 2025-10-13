@@ -5,10 +5,32 @@
 @inject IJSRuntime JSRuntime
 @inject IAuthService AuthService
 @inject IJwtClientService JwtClientService
+@inject UsuarioService UsuarioService
 @inject NavigationManager Navigation
 
 <AuthGuard>
-    <div class="home-member-container">
+    @if (verificandoRoles)
+    {
+        <div class="d-flex justify-content-center align-items-center" style="height: 50vh;">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3"></div>
+                <p class="text-muted">Verificando permisos...</p>
+            </div>
+        </div>
+    }
+    else if (!esAdministrador)
+    {
+        <div class="alert alert-warning m-4">
+            <h4><i class="oi oi-shield me-2"></i>Acceso Restringido</h4>
+            <p>Esta página está disponible solo para usuarios administradores.</p>
+            <button class="btn btn-primary" @onclick="IrAMisTorneos">
+                <i class="oi oi-arrow-left me-1"></i>Ir a Mis Torneos
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="home-member-container">
         <!-- Header con información del usuario -->
         <div class="user-welcome-section">
             <div class="container-fluid">
@@ -192,18 +214,25 @@
             </div>
         </div>
     </div>
+    }
 </AuthGuard>
 
 @code {
     private string userName = string.Empty;
     private string userEmail = string.Empty;
     private string? userPicture = null;
+    
+    // Variables para control de roles
+    private bool verificandoRoles = true;
+    private bool esAdministrador = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await LoadUserDataAsync();
+            await VerificarRolesAsync();
+            verificandoRoles = false;
             StateHasChanged();
         }
     }
@@ -261,5 +290,44 @@
     private void NavigateToCreateTournament()
     {
         Navigation.NavigateTo("/members/create-tournament");
+    }
+
+    private async Task VerificarRolesAsync()
+    {
+        try
+        {
+            var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                // Primero verificar en JWT claims
+                var claims = JwtClientService.GetAllClaimsFromToken(token);
+                var roleFromToken = claims.TryGetValue("role", out var tokenRole) ? tokenRole : 
+                                   claims.TryGetValue("Role", out var tokenRole2) ? tokenRole2 : null;
+
+                if (roleFromToken == "admin" || roleFromToken == "super_admin")
+                {
+                    esAdministrador = true;
+                    return;
+                }
+
+                // Si no hay rol en el token o no es admin, verificar en la base de datos
+                var userEmail = JwtClientService.GetUserEmailFromToken(token);
+                if (!string.IsNullOrEmpty(userEmail))
+                {
+                    var roleFromDb = await UsuarioService.GetUserRoleByEmailAsync(userEmail);
+                    esAdministrador = roleFromDb == "admin" || roleFromDb == "super_admin";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error verificando roles: {ex.Message}");
+            esAdministrador = false;
+        }
+    }
+
+    private void IrAMisTorneos()
+    {
+        Navigation.NavigateTo("/members/my-tournaments-playing");
     }
 }

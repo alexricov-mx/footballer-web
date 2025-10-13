@@ -1,0 +1,142 @@
+@page "/test-equipos"
+@using FootballerWeb.Services
+@using FootballerWeb.DTOs
+@inject EquipoService EquipoService
+@inject IJSRuntime JSRuntime
+
+<h3>Test de Equipos - Debug</h3>
+
+<div class="alert alert-info">
+    <h5>Este es un test para verificar que el API funciona correctamente</h5>
+    <p>Estado: @estado</p>
+</div>
+
+<button class="btn btn-primary" @onclick="TestearAPI" disabled="@cargando">
+    @if (cargando)
+    {
+        <span class="spinner-border spinner-border-sm me-1"></span>
+    }
+    Probar API de Equipos
+</button>
+
+<button class="btn btn-secondary ms-2" @onclick="VerToken">
+    Ver Token en LocalStorage
+</button>
+
+@if (!string.IsNullOrEmpty(token))
+{
+    <div class="mt-3">
+        <h5>Token:</h5>
+        <textarea class="form-control" rows="3" readonly>@token</textarea>
+    </div>
+}
+
+@if (equipos != null)
+{
+    <div class="mt-4">
+        <h5>Equipos encontrados: @equipos.Count</h5>
+        
+        @if (equipos.Any())
+        {
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>ID Liga</th>
+                        <th>ID Cuenta Usuario</th>
+                        <th>Vigente</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var equipo in equipos)
+                    {
+                        <tr>
+                            <td>@equipo.IdEquipo</td>
+                            <td>@equipo.Nombre</td>
+                            <td>@equipo.IdLiga</td>
+                            <td>-</td>
+                            <td>@equipo.Vigente</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <div class="alert alert-warning">No se encontraron equipos</div>
+        }
+    </div>
+}
+}
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger mt-3">
+        <h5>Error:</h5>
+        <p>@error</p>
+    </div>
+}
+
+@code {
+    private string estado = "No iniciado";
+    private bool cargando = false;
+    private List<Equipo>? equipos;
+    private string error = string.Empty;
+    private string token = string.Empty;
+
+    private async Task TestearAPI()
+    {
+        cargando = true;
+        estado = "Cargando...";
+        error = string.Empty;
+        equipos = null;
+        StateHasChanged();
+
+        try
+        {
+            estado = "Obteniendo equipos del usuario...";
+            StateHasChanged();
+            
+            equipos = await EquipoService.GetEquiposPorUsuarioAsync();
+            
+            if (equipos == null)
+            {
+                estado = "API devolvió null";
+                error = "El servicio devolvió null, posiblemente hay un problema de autenticación";
+            }
+            else if (!equipos.Any())
+            {
+                estado = "API devolvió lista vacía";
+                error = "El servicio devolvió una lista vacía. Verifica que tengas equipos creados.";
+            }
+            else
+            {
+                estado = $"Éxito - {equipos.Count} equipos encontrados";
+            }
+        }
+        catch (Exception ex)
+        {
+            estado = "Error";
+            error = ex.ToString();
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task VerToken()
+    {
+        try
+        {
+            token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken") ?? "No hay token";
+        }
+        catch (Exception ex)
+        {
+            token = $"Error obteniendo token: {ex.Message}";
+        }
+        StateHasChanged();
+    }
+}

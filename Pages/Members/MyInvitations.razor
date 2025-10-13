@@ -1,0 +1,566 @@
+@page "/members/my-invitations"
+@using FootballerWeb.Services
+@using FootballerWeb.Shared.Components
+@using FootballerWeb.DTOs
+@using FootballerWeb.Models
+@inject NavigationManager Navigation
+@inject UsuarioService UsuarioService
+@inject ToastService ToastService
+@inject IJSRuntime JSRuntime
+
+<AuthGuard>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div>
+                        <h1 class="h2">
+                            <i class="oi oi-envelope-closed text-primary me-2"></i>
+                            Mis Invitaciones
+                        </h1>
+                        <p class="text-muted">Administra las invitaciones que has recibido</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-success" @onclick="MostrarModalCodigo">
+                            <i class="oi oi-plus me-1"></i>Usar Código
+                        </button>
+                        <button class="btn btn-outline-primary" @onclick="RefreshInvitaciones">
+                            <i class="oi oi-reload me-1"></i>Actualizar
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick="BackToHome">
+                            <i class="oi oi-arrow-left me-2"></i>Regresar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invitaciones de Liga -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="oi oi-trophy text-warning me-2"></i>
+                            Invitaciones a Ligas (@(invitacionesLiga?.Count ?? 0))
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        @if (cargandoInvitacionesLiga)
+                        {
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <p class="mt-2">Cargando invitaciones de ligas...</p>
+                            </div>
+                        }
+                        else if (invitacionesLiga?.Any() == true)
+                        {
+                            <div class="row">
+                                @foreach (var invitacion in invitacionesLiga)
+                                {
+                                    <div class="col-lg-6 col-xl-4 mb-3">
+                                        <div class="card border-warning">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                                    <h5 class="card-title text-warning">@invitacion.NombreLiga</h5>
+                                                    <span class="badge bg-warning text-dark">Liga</span>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <p class="card-text small text-muted mb-1">
+                                                        <i class="oi oi-person me-1"></i>
+                                                        Invitado por: @(invitacion.NombreInvitador ?? "Administrador")
+                                                    </p>
+                                                    <p class="card-text small text-muted mb-1">
+                                                        <i class="oi oi-calendar me-1"></i>
+                                                        Fecha: @invitacion.FechaInvitacion.ToString("dd/MM/yyyy HH:mm")
+                                                    </p>
+                                                    <p class="card-text small text-muted mb-1">
+                                                        <i class="oi oi-clock me-1"></i>
+                                                        Expira: @invitacion.FechaExpiracion.ToString("dd/MM/yyyy")
+                                                    </p>
+                                                    <p class="card-text small text-muted">
+                                                        <i class="oi oi-tag me-1"></i>
+                                                        Rol: <span class="badge bg-secondary">@invitacion.TipoInvitacion</span>
+                                                    </p>
+                                                </div>
+
+                                                @if (!string.IsNullOrEmpty(invitacion.MensajePersonalizado))
+                                                {
+                                                    <div class="alert alert-info py-2 mb-3">
+                                                        <small><i class="oi oi-info me-1"></i>@invitacion.MensajePersonalizado</small>
+                                                    </div>
+                                                }
+
+                                                <div class="mb-2">
+                                                    <small class="text-muted">Código de invitación:</small>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" class="form-control font-monospace" 
+                                                               value="@invitacion.CodigoInvitacion" readonly />
+                                                        <button class="btn btn-outline-secondary" type="button" 
+                                                                @onclick="() => CopiarCodigo(invitacion.CodigoInvitacion)">
+                                                            <i class="oi oi-clipboard"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="d-flex gap-2 mt-3">
+                                                    <button class="btn btn-success btn-sm flex-fill" 
+                                                            @onclick="() => AceptarInvitacionLiga(invitacion)"
+                                                            disabled="@procesandoInvitacion">
+                                                        @if (procesandoInvitacion)
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm me-1"></span>
+                                                        }
+                                                        <i class="oi oi-check me-1"></i>Aceptar
+                                                    </button>
+                                                    <button class="btn btn-outline-danger btn-sm flex-fill" 
+                                                            @onclick="() => RechazarInvitacionLiga(invitacion)"
+                                                            disabled="@procesandoInvitacion">
+                                                        <i class="oi oi-x me-1"></i>Rechazar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center py-5">
+                                <i class="oi oi-circle-check display-1 text-success mb-3"></i>
+                                <h5 class="text-muted">No tienes invitaciones de liga pendientes</h5>
+                                <p class="text-muted">Las invitaciones aparecerán aquí cuando otros usuarios te inviten a sus ligas.</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invitaciones de Usuario -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="mb-0">
+                            <i class="oi oi-people text-info me-2"></i>
+                            Invitaciones al Sistema (@(invitacionesUsuario?.Count ?? 0))
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        @if (cargandoInvitacionesUsuario)
+                        {
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-info" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <p class="mt-2">Cargando invitaciones de usuario...</p>
+                            </div>
+                        }
+                        else if (invitacionesUsuario?.Any() == true)
+                        {
+                            <div class="row">
+                                @foreach (var invitacion in invitacionesUsuario)
+                                {
+                                    <div class="col-lg-6 col-xl-4 mb-3">
+                                        <div class="card border-info">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                                    <h5 class="card-title text-info">Invitación al Sistema</h5>
+                                                    <span class="badge bg-info">Sistema</span>
+                                                </div>
+                                                
+                                                <div class="mb-3">
+                                                    <p class="card-text small text-muted mb-1">
+                                                        <i class="oi oi-calendar me-1"></i>
+                                                        Fecha: @invitacion.FechaInvitacion.ToString("dd/MM/yyyy HH:mm")
+                                                    </p>
+                                                    <p class="card-text small text-muted">
+                                                        <i class="oi oi-clock me-1"></i>
+                                                        Expira: @invitacion.FechaExpiracion.ToString("dd/MM/yyyy")
+                                                    </p>
+                                                </div>
+
+                                                @if (!string.IsNullOrEmpty(invitacion.MensajePersonalizado))
+                                                {
+                                                    <div class="alert alert-info py-2 mb-3">
+                                                        <small><i class="oi oi-info me-1"></i>@invitacion.MensajePersonalizado</small>
+                                                    </div>
+                                                }
+
+                                                <div class="mb-2">
+                                                    <small class="text-muted">Código de invitación:</small>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="text" class="form-control font-monospace" 
+                                                               value="@invitacion.CodigoInvitacion" readonly />
+                                                        <button class="btn btn-outline-secondary" type="button" 
+                                                                @onclick="() => CopiarCodigo(invitacion.CodigoInvitacion)">
+                                                            <i class="oi oi-clipboard"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="d-flex gap-2 mt-3">
+                                                    <button class="btn btn-success btn-sm flex-fill" 
+                                                            @onclick="() => AceptarInvitacionUsuario(invitacion)"
+                                                            disabled="@procesandoInvitacion">
+                                                        @if (procesandoInvitacion)
+                                                        {
+                                                            <span class="spinner-border spinner-border-sm me-1"></span>
+                                                        }
+                                                        <i class="oi oi-check me-1"></i>Aceptar
+                                                    </button>
+                                                    <button class="btn btn-outline-danger btn-sm flex-fill" 
+                                                            @onclick="() => RechazarInvitacionUsuario(invitacion)"
+                                                            disabled="@procesandoInvitacion">
+                                                        <i class="oi oi-x me-1"></i>Rechazar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center py-5">
+                                <i class="oi oi-circle-check display-1 text-success mb-3"></i>
+                                <h5 class="text-muted">No tienes invitaciones de usuario pendientes</h5>
+                                <p class="text-muted">Ya eres parte del sistema.</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para ingresar código manualmente -->
+    @if (mostrarModalCodigo)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="oi oi-key me-2"></i>Usar Código de Invitación
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="CerrarModalCodigo"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="codigoInvitacion" class="form-label">Código de Invitación</label>
+                            <input type="text" class="form-control font-monospace" id="codigoInvitacion" 
+                                   @bind="codigoManual" @bind:event="oninput"
+                                   placeholder="Ej: INV001, LIG123ABC, etc."
+                                   style="text-transform: uppercase;" />
+                            <div class="form-text">
+                                Ingresa el código que te proporcionaron para unirte a una liga o al sistema.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModalCodigo">
+                            Cancelar
+                        </button>
+                        <button type="button" class="btn btn-primary" @onclick="UsarCodigoManual"
+                                disabled="@(procesandoInvitacion || string.IsNullOrWhiteSpace(codigoManual))">
+                            @if (procesandoInvitacion)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <i class="oi oi-check me-1"></i>Usar Código
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</AuthGuard>
+
+@code {
+    // Estado de carga
+    private bool cargandoInvitacionesLiga = true;
+    private bool cargandoInvitacionesUsuario = true;
+    private bool procesandoInvitacion = false;
+
+    // Invitaciones
+    private List<InvitacionLiga>? invitacionesLiga;
+    private List<InvitacionPendiente>? invitacionesUsuario;
+
+    // Modal de código
+    private bool mostrarModalCodigo = false;
+    private string codigoManual = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarInvitaciones();
+    }
+
+    private async Task CargarInvitaciones()
+    {
+        await Task.WhenAll(
+            CargarInvitacionesLiga(),
+            CargarInvitacionesUsuario()
+        );
+    }
+
+    private async Task CargarInvitacionesLiga()
+    {
+        cargandoInvitacionesLiga = true;
+        StateHasChanged();
+
+        try
+        {
+            Console.WriteLine("DEBUG: Cargando invitaciones de liga del usuario actual...");
+            invitacionesLiga = await UsuarioService.GetMisInvitacionesLigaAsync();
+            Console.WriteLine($"DEBUG: Invitaciones de liga cargadas: {invitacionesLiga?.Count ?? -1}");
+            ToastService.ShowInfo($"Debug: Se cargaron {invitacionesLiga?.Count ?? 0} invitaciones de liga");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DEBUG: Error al cargar invitaciones de liga: {ex.Message}");
+            ToastService.ShowError("Error al cargar invitaciones de liga: " + ex.Message);
+            invitacionesLiga = new List<InvitacionLiga>();
+        }
+        finally
+        {
+            cargandoInvitacionesLiga = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CargarInvitacionesUsuario()
+    {
+        cargandoInvitacionesUsuario = true;
+        StateHasChanged();
+
+        try
+        {
+            Console.WriteLine("DEBUG: Cargando invitaciones de usuario...");
+            invitacionesUsuario = await UsuarioService.GetInvitacionesPendientesAsync();
+            Console.WriteLine($"DEBUG: Invitaciones de usuario cargadas: {invitacionesUsuario?.Count ?? -1}");
+            ToastService.ShowInfo($"Debug: Se cargaron {invitacionesUsuario?.Count ?? 0} invitaciones de usuario");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DEBUG: Error al cargar invitaciones de usuario: {ex.Message}");
+            ToastService.ShowError("Error al cargar invitaciones de usuario: " + ex.Message);
+            invitacionesUsuario = new List<InvitacionPendiente>();
+        }
+        finally
+        {
+            cargandoInvitacionesUsuario = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshInvitaciones()
+    {
+        await CargarInvitaciones();
+        ToastService.ShowSuccess("Invitaciones actualizadas");
+    }
+
+    private async Task AceptarInvitacionLiga(InvitacionLiga invitacion)
+    {
+        procesandoInvitacion = true;
+        StateHasChanged();
+
+        try
+        {
+            var exito = await UsuarioService.AceptarInvitacionLigaAsync(invitacion.CodigoInvitacion);
+            if (exito)
+            {
+                ToastService.ShowSuccess($"¡Te has unido exitosamente a la liga '{invitacion.NombreLiga}'!");
+                await CargarInvitacionesLiga(); // Recargar para actualizar la lista
+            }
+            else
+            {
+                ToastService.ShowError("No se pudo aceptar la invitación. El código puede haber expirado.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al aceptar invitación: " + ex.Message);
+        }
+        finally
+        {
+            procesandoInvitacion = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RechazarInvitacionLiga(InvitacionLiga invitacion)
+    {
+        procesandoInvitacion = true;
+        StateHasChanged();
+
+        try
+        {
+            var exito = await UsuarioService.RechazarInvitacionLigaAsync(invitacion.CodigoInvitacion);
+            if (exito)
+            {
+                ToastService.ShowSuccess($"Invitación a la liga '{invitacion.NombreLiga}' rechazada.");
+                await CargarInvitacionesLiga(); // Recargar para actualizar la lista
+            }
+            else
+            {
+                ToastService.ShowError("No se pudo rechazar la invitación.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al rechazar invitación: " + ex.Message);
+        }
+        finally
+        {
+            procesandoInvitacion = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task AceptarInvitacionUsuario(InvitacionPendiente invitacion)
+    {
+        procesandoInvitacion = true;
+        StateHasChanged();
+
+        try
+        {
+            var exito = await UsuarioService.AceptarInvitacionUsuarioAsync(invitacion.CodigoInvitacion);
+            if (exito)
+            {
+                ToastService.ShowSuccess("¡Invitación de usuario aceptada exitosamente!");
+                await CargarInvitacionesUsuario(); // Recargar para actualizar la lista
+            }
+            else
+            {
+                ToastService.ShowError("No se pudo aceptar la invitación de usuario.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al aceptar invitación de usuario: " + ex.Message);
+        }
+        finally
+        {
+            procesandoInvitacion = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RechazarInvitacionUsuario(InvitacionPendiente invitacion)
+    {
+        procesandoInvitacion = true;
+        StateHasChanged();
+
+        try
+        {
+            var exito = await UsuarioService.RechazarInvitacionUsuarioAsync(invitacion.CodigoInvitacion);
+            if (exito)
+            {
+                ToastService.ShowSuccess("Invitación de usuario rechazada.");
+                await CargarInvitacionesUsuario(); // Recargar para actualizar la lista
+            }
+            else
+            {
+                ToastService.ShowError("No se pudo rechazar la invitación de usuario.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al rechazar invitación de usuario: " + ex.Message);
+        }
+        finally
+        {
+            procesandoInvitacion = false;
+            StateHasChanged();
+        }
+    }
+
+    private void MostrarModalCodigo()
+    {
+        mostrarModalCodigo = true;
+        codigoManual = string.Empty;
+        StateHasChanged();
+    }
+
+    private void CerrarModalCodigo()
+    {
+        mostrarModalCodigo = false;
+        StateHasChanged();
+    }
+
+    private async Task UsarCodigoManual()
+    {
+        if (string.IsNullOrWhiteSpace(codigoManual))
+            return;
+
+        procesandoInvitacion = true;
+        StateHasChanged();
+
+        try
+        {
+            var codigo = codigoManual.Trim().ToUpperInvariant();
+            
+            // Intentar como invitación de liga primero
+            if (codigo.StartsWith("LIG"))
+            {
+                var exito = await UsuarioService.AceptarInvitacionLigaAsync(codigo);
+                if (exito)
+                {
+                    ToastService.ShowSuccess("¡Te has unido exitosamente a la liga!");
+                    await CargarInvitacionesLiga();
+                    CerrarModalCodigo();
+                    return;
+                }
+            }
+            
+            // Intentar como invitación de usuario
+            if (codigo.StartsWith("INV"))
+            {
+                var exito = await UsuarioService.AceptarInvitacionUsuarioAsync(codigo);
+                if (exito)
+                {
+                    ToastService.ShowSuccess("¡Invitación de usuario aceptada exitosamente!");
+                    await CargarInvitacionesUsuario();
+                    CerrarModalCodigo();
+                    return;
+                }
+            }
+            
+            ToastService.ShowError("Código de invitación inválido o expirado.");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al procesar código: " + ex.Message);
+        }
+        finally
+        {
+            procesandoInvitacion = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CopiarCodigo(string codigo)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", codigo);
+            ToastService.ShowSuccess("Código copiado al portapapeles");
+        }
+        catch
+        {
+            ToastService.ShowInfo("Código: " + codigo);
+        }
+    }
+
+    private void BackToHome()
+    {
+        Navigation.NavigateTo("/members/my-tournaments-playing");
+    }
+}

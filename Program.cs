@@ -18,6 +18,8 @@ builder.Services.AddScoped<IMemberService, MemberService>();
 builder.Services.AddScoped<IContentService, ContentService>();
 builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<ToastService>();
+builder.Services.AddScoped<LigaService>();
+builder.Services.AddScoped<EquipoService>();
 
 // HttpClient para componentes Blazor
 builder.Services.AddScoped(sp => new HttpClient

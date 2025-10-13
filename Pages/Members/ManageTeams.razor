@@ -1,0 +1,365 @@
+@page "/members/manage-teams"
+@using FootballerWeb.Services
+@using FootballerWeb.DTOs
+@using FootballerWeb.Models
+@using FootballerWeb.Shared.Components
+@using static FootballerWeb.Services.EquipoService
+@inject NavigationManager Navigation
+@inject EquipoService EquipoService
+@inject ToastService ToastService
+@inject IJSRuntime JSRuntime
+
+<AuthGuard>
+    <div class="members-container">
+        <MembersHeader />
+        
+        <div class="members-content">
+            <div class="container-fluid">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h2><i class="oi oi-people text-primary me-2"></i>Gestión de Equipos</h2>
+                        <p class="text-muted">Administra los equipos disponibles en el sistema</p>
+                    </div>
+                    <button class="btn btn-primary" @onclick="MostrarModalCrear">
+                        <i class="oi oi-plus me-2"></i>Nuevo Equipo
+                    </button>
+                </div>
+
+                @if (cargando)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Cargando equipos...</p>
+                    </div>
+                }
+                else
+                {
+                    <!-- Lista de Equipos -->
+                    <div class="row">
+                        @if (equipos?.Any() == true)
+                        {
+                            @foreach (var equipo in equipos)
+                            {
+                                <div class="col-md-6 col-lg-4 mb-4">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                                <h5 class="card-title mb-0">@equipo.Nombre</h5>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                        <i class="oi oi-cog"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu">
+                                                        <li><a class="dropdown-item" href="#" @onclick="() => EditarEquipo(equipo)">
+                                                            <i class="oi oi-pencil me-2"></i>Editar
+                                                        </a></li>
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li><a class="dropdown-item text-danger" href="#" @onclick="() => ConfirmarEliminar(equipo)">
+                                                            <i class="oi oi-trash me-2"></i>Eliminar
+                                                        </a></li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                            
+                                            @if (!string.IsNullOrEmpty(equipo.Descripcion))
+                                            {
+                                                <p class="card-text text-muted small">@equipo.Descripcion</p>
+                                            }
+                                            
+                                            <div class="mt-auto">
+                                                <div class="row text-center">
+                                                    <div class="col-6">
+                                                        <div class="stat-item">
+                                                            <strong class="text-primary">0</strong>
+                                                            <small class="d-block text-muted">Torneos</small>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <div class="stat-item">
+                                                            <span class="badge bg-success">Disponible</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="col-12">
+                                <div class="text-center py-5">
+                                    <i class="oi oi-people display-1 text-muted"></i>
+                                    <h4 class="mt-3">No hay equipos registrados</h4>
+                                    <p class="text-muted">Crea tu primer equipo para comenzar</p>
+                                    <button class="btn btn-primary" @onclick="MostrarModalCrear">
+                                        <i class="oi oi-plus me-2"></i>Crear Primer Equipo
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Crear/Editar Equipo -->
+    @if (mostrarModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            @if (equipoEditando == null)
+                            {
+                                <text><i class="oi oi-plus me-2"></i>Nuevo Equipo</text>
+                            }
+                            else
+                            {
+                                <text><i class="oi oi-pencil me-2"></i>Editar Equipo</text>
+                            }
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="CerrarModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form @onsubmit="GuardarEquipo" @onsubmit:preventDefault="true">
+                            <div class="mb-3">
+                                <label class="form-label">Nombre del Equipo *</label>
+                                <input type="text" class="form-control" @bind="equipoForm.Nombre" placeholder="Ej: Real Madrid" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Descripción</label>
+                                <textarea class="form-control" rows="3" @bind="equipoForm.Descripcion" placeholder="Descripción opcional del equipo"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" @onclick="GuardarEquipo" disabled="@guardando">
+                            @if (guardando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            @if (equipoEditando == null)
+                            {
+                                <text>Crear Equipo</text>
+                            }
+                            else
+                            {
+                                <text>Guardar Cambios</text>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Modal Confirmar Eliminación -->
+    @if (mostrarModalEliminar)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title text-danger">
+                            <i class="oi oi-warning me-2"></i>Confirmar Eliminación
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="CerrarModalEliminar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>¿Estás seguro de que deseas eliminar el equipo <strong>@equipoAEliminar?.Nombre</strong>?</p>
+                        <div class="alert alert-warning">
+                            <small><i class="oi oi-warning me-1"></i>Esta acción no se puede deshacer. El equipo será eliminado permanentemente.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModalEliminar">Cancelar</button>
+                        <button type="button" class="btn btn-danger" @onclick="EliminarEquipo" disabled="@eliminando">
+                            @if (eliminando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Eliminar Equipo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</AuthGuard>
+
+<style>
+    .members-container {
+        min-height: 100vh;
+        background: #f8f9fa;
+    }
+
+    .members-content {
+        padding: 2rem 0;
+    }
+
+    .card {
+        transition: transform 0.2s ease;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+
+    .stat-item {
+        padding: 0.5rem 0;
+    }
+
+    .modal.show {
+        display: block !important;
+    }
+</style>
+
+@code {
+    private bool cargando = true;
+    private List<EquipoDto>? equipos;
+    
+    // Modal crear/editar
+    private bool mostrarModal = false;
+    private bool guardando = false;
+    private EquipoDto? equipoEditando = null;
+    private EquipoFormDto equipoForm = new();
+    
+    // Modal eliminar
+    private bool mostrarModalEliminar = false;
+    private bool eliminando = false;
+    private EquipoDto? equipoAEliminar = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarEquipos();
+    }
+
+    private async Task CargarEquipos()
+    {
+        try
+        {
+            cargando = true;
+            equipos = await EquipoService.GetEquiposAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando equipos: {ex.Message}");
+            ToastService.ShowError("Error al cargar los equipos");
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private void MostrarModalCrear()
+    {
+        equipoEditando = null;
+        equipoForm = new EquipoFormDto();
+        mostrarModal = true;
+    }
+
+    private void EditarEquipo(EquipoDto equipo)
+    {
+        equipoEditando = equipo;
+        equipoForm = new EquipoFormDto
+        {
+            Nombre = equipo.Nombre,
+            Descripcion = equipo.Descripcion
+        };
+        mostrarModal = true;
+    }
+
+    private void CerrarModal()
+    {
+        mostrarModal = false;
+        equipoEditando = null;
+        equipoForm = new EquipoFormDto();
+    }
+
+    private async Task GuardarEquipo()
+    {
+        if (string.IsNullOrWhiteSpace(equipoForm.Nombre))
+        {
+            ToastService.ShowError("El nombre del equipo es requerido");
+            return;
+        }
+
+        try
+        {
+            guardando = true;
+
+            if (equipoEditando == null)
+            {
+                // Crear nuevo equipo
+                await EquipoService.CrearEquipoAsync(equipoForm);
+                ToastService.ShowSuccess("Equipo creado exitosamente");
+            }
+            else
+            {
+                // Actualizar equipo existente
+                await EquipoService.ActualizarEquipoAsync(equipoEditando.Id, equipoForm);
+                ToastService.ShowSuccess("Equipo actualizado exitosamente");
+            }
+
+            CerrarModal();
+            await CargarEquipos();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error guardando equipo: {ex.Message}");
+            ToastService.ShowError("Error al guardar el equipo");
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private void ConfirmarEliminar(EquipoDto equipo)
+    {
+        equipoAEliminar = equipo;
+        mostrarModalEliminar = true;
+    }
+
+    private void CerrarModalEliminar()
+    {
+        mostrarModalEliminar = false;
+        equipoAEliminar = null;
+    }
+
+    private async Task EliminarEquipo()
+    {
+        if (equipoAEliminar == null) return;
+
+        try
+        {
+            eliminando = true;
+            await EquipoService.EliminarEquipoAsync(equipoAEliminar.Id);
+            ToastService.ShowSuccess("Equipo eliminado exitosamente");
+            
+            CerrarModalEliminar();
+            await CargarEquipos();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error eliminando equipo: {ex.Message}");
+            ToastService.ShowError("Error al eliminar el equipo");
+        }
+        finally
+        {
+            eliminando = false;
+        }
+    }
+
+}

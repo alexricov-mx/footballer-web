@@ -1,7 +1,13 @@
 @page "/members/my-tournaments"
 @using FootballerWeb.Services
 @using FootballerWeb.Shared.Components
+@using FootballerWeb.DTOs
+@using static FootballerWeb.Services.LigaService
 @inject NavigationManager Navigation
+@inject LigaService LigaService
+@inject EquipoService EquipoService
+@inject ToastService ToastService
+@inject IJSRuntime JSRuntime
 
 <AuthGuard>
     <div class="container-fluid mt-4">
@@ -10,15 +16,20 @@
                 <div class="d-flex align-items-center justify-content-between mb-4">
                     <div>
                         <h1 class="h2">
-                            <i class="oi oi-list-rich text-primary me-2"></i>
-                            Mis Torneos
+                            <i class="oi oi-trophy text-warning me-2"></i>
+                            Mis Ligas
                         </h1>
-                        <p class="text-muted">Gestiona y consulta tus torneos registrados</p>
+                        <p class="text-muted">Gestiona y consulta tus ligas registradas</p>
                     </div>
-                    <button class="btn btn-outline-secondary" @onclick="BackToHome">
-                        <i class="oi oi-arrow-left me-2"></i>
-                        Regresar al Inicio
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-primary" @onclick="RefreshLigas">
+                            <i class="oi oi-reload me-1"></i>Actualizar
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick="BackToHome">
+                            <i class="oi oi-arrow-left me-2"></i>
+                            Regresar al Inicio
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -26,42 +37,827 @@
         <div class="row">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-body text-center py-5">
-                        <i class="oi oi-info display-1 text-info mb-3"></i>
-                        <h3>Próximamente disponible</h3>
-                        <p class="text-muted mb-4">Esta sección estará disponible muy pronto. Aquí podrás:</p>
-                        <ul class="list-unstyled">
-                            <li class="mb-2">
-                                <i class="oi oi-check text-success me-2"></i>
-                                Ver todos tus torneos activos
-                            </li>
-                            <li class="mb-2">
-                                <i class="oi oi-check text-success me-2"></i>
-                                Consultar historial de participaciones
-                            </li>
-                            <li class="mb-2">
-                                <i class="oi oi-check text-success me-2"></i>
-                                Ver estadísticas personales
-                            </li>
-                            <li class="mb-2">
-                                <i class="oi oi-check text-success me-2"></i>
-                                Consultar resultados y clasificaciones
-                            </li>
-                        </ul>
-                        <button class="btn btn-primary mt-3" @onclick="BackToHome">
-                            <i class="oi oi-home me-2"></i>
-                            Volver al Inicio
-                        </button>
+                    <div class="card-body">
+                        @if (cargandoLigas)
+                        {
+                            <div class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Cargando...</span>
+                                </div>
+                                <p class="mt-2">Cargando ligas...</p>
+                            </div>
+                        }
+                        else if (ligas == null || !ligas.Any())
+                        {
+                            <div class="text-center py-5">
+                                <i class="oi oi-circle-x display-1 text-muted mb-3"></i>
+                                <h5 class="text-muted">No tienes ligas registradas</h5>
+                                <p class="text-muted">Crea tu primera liga o espera a ser invitado a una.</p>
+                                <div class="mt-4">
+                                    <button class="btn btn-success btn-lg" @onclick="CrearNuevaLiga">
+                                        <i class="oi oi-plus me-2"></i>
+                                        Crear Mi Primera Liga
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="row">
+                                @foreach (var liga in ligas)
+                                {
+                                    <div class="col-md-6 col-lg-4 mb-4">
+                                        <div class="card h-100 @GetLigaCardClass(liga.Estado)">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start mb-3">
+                                                    <h5 class="card-title">@liga.Nombre</h5>
+                                                    <span class="badge @GetEstadoBadgeClass(liga.Estado)">
+                                                        @liga.Estado.ToUpper()
+                                                    </span>
+                                                </div>
+                                                
+                                                @if (!string.IsNullOrEmpty(liga.Descripcion))
+                                                {
+                                                    <p class="card-text text-muted small">@liga.Descripcion</p>
+                                                }
+                                                
+                                                <div class="small text-muted mb-3">
+                                                    <div><i class="oi oi-person me-1"></i>Creada por: @liga.CreadorNombre</div>
+                                                    <div><i class="oi oi-people me-1"></i>Equipos: @liga.CantidadEquipos</div>
+                                                    <div><i class="oi oi-calendar me-1"></i>Creada: @liga.FechaCreacion.ToString("dd/MM/yyyy")</div>
+                                                    @if (liga.FechaInicio.HasValue)
+                                                    {
+                                                        <div><i class="oi oi-media-play me-1"></i>Inicio: @liga.FechaInicio.Value.ToString("dd/MM/yyyy")</div>
+                                                    }
+                                                </div>
+
+                                                <!-- Equipos Disponibles -->
+                                                @if (equiposPorLiga.ContainsKey(liga.IdLiga) && equiposPorLiga[liga.IdLiga].Any())
+                                                {
+                                                    <div class="mb-3">
+                                                        <small class="text-primary fw-semibold d-block mb-2">
+                                                            <i class="oi oi-list me-1"></i>
+                                                            Equipos Disponibles (@equiposPorLiga[liga.IdLiga].Count):
+                                                        </small>
+                                                        <div class="d-flex flex-wrap gap-1">
+                                                            @foreach (var equipo in equiposPorLiga[liga.IdLiga].Take(3))
+                                                            {
+                                                                <span class="badge bg-light text-dark border" title="@equipo.Nombre">
+                                                                    @(equipo.Nombre.Length > 10 ? equipo.Nombre.Substring(0, 10) + "..." : equipo.Nombre)
+                                                                </span>
+                                                            }
+                                                            @if (equiposPorLiga[liga.IdLiga].Count > 3)
+                                                            {
+                                                                <span class="badge bg-secondary">
+                                                                    +@(equiposPorLiga[liga.IdLiga].Count - 3) más
+                                                                </span>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                }
+                                                else if (equiposPorLiga.ContainsKey(liga.IdLiga))
+                                                {
+                                                    <div class="mb-3">
+                                                        <small class="text-muted">
+                                                            <i class="oi oi-info me-1"></i>
+                                                            No hay equipos disponibles para esta liga
+                                                        </small>
+                                                    </div>
+                                                }
+
+                                                <div class="mb-3">
+                                                    <span class="badge bg-info">@liga.MiRolEnLiga</span>
+                                                </div>
+
+                                                <div class="d-flex gap-2 flex-wrap">
+                                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => VerDetallesLiga(liga)">
+                                                        <i class="oi oi-eye me-1"></i>Ver Detalle
+                                                    </button>
+                                                    
+                                                    @if (liga.MiRolEnLiga == "admin_liga" || liga.MiRolEnLiga == "super_admin")
+                                                    {
+                                                        <button class="btn btn-outline-warning btn-sm" @onclick="() => GestionarEquipos(liga.IdLiga)">
+                                                            <i class="oi oi-people me-1"></i>Gestionar Equipos
+                                                        </button>
+                                                    }
+
+                                                    
+                                                    @if (liga.PuedoInvitar && (liga.Estado == "abierta" || liga.Estado == "pendiente"))
+                                                    {
+                                                        <button class="btn btn-outline-success btn-sm" @onclick="() => AbrirModalInvitar(liga)">
+                                                            <i class="oi oi-person me-1"></i>Invitar
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Modal de Invitar Jugadores -->
+    @if (ligaSeleccionada != null && mostrarModalInvitar)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="oi oi-person me-2"></i>Invitar Jugadores - @ligaSeleccionada.Nombre
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="CerrarModalInvitar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Formulario de invitación -->
+                        <div class="row mb-4">
+                            <div class="col-md-8">
+                                <label for="emailInvitado" class="form-label">Email del jugador</label>
+                                <input type="email" class="form-control" id="emailInvitado" 
+                                       @bind="emailInvitado" @bind:event="oninput"
+                                       placeholder="ejemplo@correo.com" />
+                            </div>
+                            <div class="col-md-4">
+                                <label for="tipoInvitacion" class="form-label">Tipo</label>
+                                <select class="form-select" id="tipoInvitacion" @bind="tipoInvitacion">
+                                    <option value="jugador">Jugador</option>
+                                    <option value="admin_liga">Admin Liga</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="mensajePersonalizado" class="form-label">Mensaje personal (opcional)</label>
+                            <textarea class="form-control" id="mensajePersonalizado" rows="3" 
+                                      @bind="mensajePersonalizado"
+                                      placeholder="Escribe un mensaje personalizado para la invitación..."></textarea>
+                        </div>
+
+                        <div class="d-flex gap-2 mb-4">
+                            <button class="btn btn-success" @onclick="EnviarInvitacion" disabled="@(procesandoInvitacion || string.IsNullOrWhiteSpace(emailInvitado))">
+                                @if (procesandoInvitacion)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                else
+                                {
+                                    <i class="oi oi-envelope-closed me-1"></i>
+                                }
+                                Enviar Invitación
+                            </button>
+                            <button class="btn btn-secondary" @onclick="CerrarModalInvitar">Cerrar</button>
+                        </div>
+
+                        <!-- Lista de invitaciones pendientes -->
+                        <hr />
+                        <h6><i class="oi oi-clock me-1"></i>Invitaciones Pendientes</h6>
+                        
+                        @if (cargandoInvitaciones)
+                        {
+                            <div class="text-center py-2">
+                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                            </div>
+                        }
+                        else if (invitacionesPendientes == null || !invitacionesPendientes.Any())
+                        {
+                            <p class="text-muted small">No hay invitaciones pendientes</p>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Email</th>
+                                            <th>Tipo</th>
+                                            <th>Código</th>
+                                            <th>Fecha</th>
+                                            <th>Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var inv in invitacionesPendientes)
+                                        {
+                                            <tr>
+                                                <td>@inv.EmailInvitado</td>
+                                                <td><span class="badge bg-secondary">@inv.TipoInvitacion</span></td>
+                                                <td><code>@inv.CodigoInvitacion</code></td>
+                                                <td>@inv.FechaInvitacion.ToString("dd/MM/yyyy")</td>
+                                                <td>
+                                                    <span class="badge @GetEstadoInvitacionBadgeClass(inv.Estado)">
+                                                        @inv.Estado
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Modal de Detalles de Liga -->
+    @if (mostrarModalDetalles && ligaDetalles != null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="oi oi-list-rich me-2"></i>Detalles - @ligaDetalles.Nombre
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="CerrarModalDetalles"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <!-- Información de la Liga -->
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">
+                                            <i class="oi oi-info me-1"></i>Información General
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <p><strong>Estado:</strong> 
+                                            <span class="badge bg-@(ligaDetalles.Estado == "abierta" ? "success" : "secondary")">
+                                                @ligaDetalles.Estado.ToUpper()
+                                            </span>
+                                        </p>
+                                        <p><strong>Equipos:</strong> @ligaDetalles.CantidadEquipos</p>
+                                        <p><strong>Creado:</strong> @ligaDetalles.FechaCreacion.ToString("dd/MM/yyyy")</p>
+                                        <p><strong>Mi Rol:</strong> 
+                                            <span class="badge bg-primary">@ligaDetalles.MiRolEnLiga</span>
+                                        </p>
+                                        
+                                        @if (ligaDetalles.Estado == "abierta" && ligaDetalles.PuedoInvitar)
+                                        {
+                                            <hr />
+                                            <button class="btn btn-warning w-100" @onclick="CerrarInscripciones">
+                                                <i class="oi oi-lock-locked me-1"></i>
+                                                Cerrar Inscripciones
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            
+
+                            
+                            <!-- Invitaciones Aceptadas -->
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0 text-success">
+                                            <i class="oi oi-circle-check me-1"></i>Usuarios Confirmados (@(invitacionesAceptadas?.Count ?? 0))
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        @if (invitacionesAceptadas?.Any() == true)
+                                        {
+                                            @foreach (var inv in invitacionesAceptadas)
+                                            {
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <div>
+                                                        <small class="text-muted">@inv.EmailInvitado</small><br />
+                                                        <span class="badge bg-success">@inv.TipoInvitacion</span>
+                                                    </div>
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <p class="text-muted text-center small">
+                                                <i class="oi oi-info me-1"></i>No hay confirmaciones aún
+                                            </p>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Invitaciones Pendientes -->
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0 text-warning">
+                                            <i class="oi oi-clock me-1"></i>Invitaciones Pendientes (@(invitacionesPendientesDetalle?.Count ?? 0))
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        @if (invitacionesPendientesDetalle?.Any() == true)
+                                        {
+                                            @foreach (var inv in invitacionesPendientesDetalle)
+                                            {
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <div>
+                                                        <small class="text-muted">@inv.EmailInvitado</small><br />
+                                                        <span class="badge bg-secondary small">@inv.TipoInvitacion</span>
+                                                        <br />
+                                                        <small class="text-muted">
+                                                            <code>@inv.CodigoInvitacion</code>
+                                                        </small>
+                                                    </div>
+                                                    <button class="btn btn-outline-danger btn-sm" 
+                                                            @onclick="() => CancelarInvitacion(inv.IdInvitacionLiga)">
+                                                        <i class="oi oi-x"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <p class="text-muted text-center small">
+                                                <i class="oi oi-info me-1"></i>No hay invitaciones pendientes
+                                            </p>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Equipos y Asignaciones -->
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0 text-primary">
+                                            <i class="oi oi-people me-1"></i>Equipos y Asignaciones
+                                        </h6>
+                                        @if (ligaDetalles?.MiRolEnLiga == "admin_liga" || ligaDetalles?.MiRolEnLiga == "super_admin")
+                                        {
+                                            <button class="btn btn-outline-primary btn-sm" @onclick="() => GestionarEquipos(ligaDetalles.IdLiga)">
+                                                <i class="oi oi-cog"></i>
+                                            </button>
+                                        }
+                                    </div>
+                                    <div class="card-body">
+                                        @if (cargandoAsignaciones)
+                                        {
+                                            <div class="text-center py-2">
+                                                <div class="spinner-border spinner-border-sm text-primary"></div>
+                                                <small class="d-block mt-1 text-muted">Cargando...</small>
+                                            </div>
+                                        }
+                                        else if (asignacionesDetalle?.Any() == true)
+                                        {
+                                            <h6 class="text-success mb-2">
+                                                <i class="oi oi-check me-1"></i>Asignaciones Actuales (@asignacionesDetalle.Count):
+                                            </h6>
+                                            
+                                            @foreach (var grupo in asignacionesDetalle.GroupBy(a => a.NumeroEquipo).OrderBy(g => g.Key))
+                                            {
+                                                <div class="mb-2 p-2 bg-light rounded">
+                                                    <strong class="text-primary">Equipo @grupo.Key:</strong>
+                                                    @foreach (var asignacion in grupo)
+                                                    {
+                                                        <div class="small text-muted ms-2">
+                                                            <i class="oi oi-person me-1"></i>@asignacion.NombreUsuario
+                                                            <br><small class="text-muted">@asignacion.EmailUsuario</small>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <!-- Mostrar equipos disponibles si no hay asignaciones -->
+                                            @if (ligaDetalles != null && equiposPorLiga.ContainsKey(ligaDetalles.IdLiga) && equiposPorLiga[ligaDetalles.IdLiga].Any())
+                                            {
+                                                <h6 class="text-info mb-2">
+                                                    <i class="oi oi-list me-1"></i>Equipos Disponibles (@equiposPorLiga[ligaDetalles.IdLiga].Count):
+                                                </h6>
+                                                @foreach (var equipo in equiposPorLiga[ligaDetalles.IdLiga])
+                                                {
+                                                    <div class="badge bg-light text-dark border me-1 mb-1">
+                                                        @equipo.Nombre
+                                                    </div>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <p class="text-muted text-center small">
+                                                    <i class="oi oi-info me-1"></i>No hay equipos asignados aún
+                                                </p>
+                                            }
+                                        }
+
+                                        <!-- Usuarios disponibles para asignar -->
+                                        @if (usuariosDisponiblesDetalle?.Any() == true && (ligaDetalles?.MiRolEnLiga == "admin_liga" || ligaDetalles?.MiRolEnLiga == "super_admin"))
+                                        {
+                                            <hr />
+                                            <h6 class="text-secondary mb-2">
+                                                <i class="oi oi-person me-1"></i>Usuarios Disponibles (@usuariosDisponiblesDetalle.Count):
+                                            </h6>
+                                            @foreach (var usuario in usuariosDisponiblesDetalle.Take(3))
+                                            {
+                                                <div class="small text-muted mb-1">
+                                                    <i class="oi oi-person me-1"></i>@usuario.Nombre
+                                                    <br><small>@usuario.Email</small>
+                                                </div>
+                                            }
+                                            @if (usuariosDisponiblesDetalle.Count > 3)
+                                            {
+                                                <small class="text-muted">+@(usuariosDisponiblesDetalle.Count - 3) más...</small>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModalDetalles">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 </AuthGuard>
 
 @code {
+    private List<Liga>? ligas;
+    private bool cargandoLigas = true;
+    
+    // Equipos por liga
+    private Dictionary<int, List<Equipo>> equiposPorLiga = new();
+    
+    // Modal de invitación
+    private Liga? ligaSeleccionada;
+    private bool mostrarModalInvitar = false;
+    private string emailInvitado = string.Empty;
+    private string tipoInvitacion = "jugador";
+    private string mensajePersonalizado = string.Empty;
+    private bool procesandoInvitacion = false;
+    
+    // Invitaciones pendientes
+    private List<InvitacionLiga>? invitacionesPendientes;
+    private bool cargandoInvitaciones = false;
+    
+    // Modal de detalles de liga
+    private bool mostrarModalDetalles = false;
+    private Liga? ligaDetalles = null;
+    private List<InvitacionLiga>? invitacionesAceptadas;
+    private List<InvitacionLiga>? invitacionesPendientesDetalle;
+    
+    // Datos de equipos y asignaciones para el modal de detalles
+    private List<AsignacionEquipoDto>? asignacionesDetalle;
+    private List<UsuarioSimpleDto>? usuariosDisponiblesDetalle;
+    private bool cargandoAsignaciones = false;
+    
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarLigas();
+    }
+
+    private async Task CargarLigas()
+    {
+        cargandoLigas = true;
+        StateHasChanged();
+        
+        try
+        {
+            ligas = await LigaService.GetMisLigasAsync();
+            
+            // Cargar equipos para cada liga
+            await CargarEquiposPorLiga();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al cargar las ligas: " + ex.Message);
+        }
+        finally
+        {
+            cargandoLigas = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CargarEquiposPorLiga()
+    {
+        if (ligas == null) return;
+
+        equiposPorLiga.Clear();
+        
+        foreach (var liga in ligas)
+        {
+            try
+            {
+                Console.WriteLine($"DEBUG: Cargando equipos para liga {liga.IdLiga}");
+                var equipos = await EquipoService.GetEquiposPorLigaAsync(liga.IdLiga);
+                if (equipos != null)
+                {
+                    equiposPorLiga[liga.IdLiga] = equipos;
+                    Console.WriteLine($"DEBUG: Equipos cargados para liga {liga.IdLiga}: {equipos.Count}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"DEBUG: Error cargando equipos para liga {liga.IdLiga}: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task RefreshLigas()
+    {
+        await CargarLigas();
+        ToastService.ShowSuccess("Ligas actualizadas");
+    }
+
+    private async Task VerDetallesLiga(Liga liga)
+    {
+        ligaDetalles = liga;
+        mostrarModalDetalles = true;
+        await CargarDetallesInvitaciones(liga.IdLiga);
+        await CargarAsignacionesDetalle(liga.IdLiga);
+    }
+    
+    private async Task CargarDetallesInvitaciones(int idLiga)
+    {
+        try
+        {
+            Console.WriteLine($"DEBUG: Cargando detalles de invitaciones para liga {idLiga}...");
+            
+            // Cargar invitaciones específicas de esta liga
+            var invitacionesLiga = await LigaService.GetInvitacionesLigaAsync(idLiga);
+            Console.WriteLine($"DEBUG: Invitaciones de liga cargadas: {invitacionesLiga?.Count ?? -1}");
+            
+            if (invitacionesLiga != null)
+            {
+                // Separar invitaciones aceptadas de pendientes basándose en el campo 'Usado'
+                invitacionesAceptadas = invitacionesLiga.Where(i => i.Usado == true).ToList();
+                invitacionesPendientesDetalle = invitacionesLiga.Where(i => i.Usado == false && i.Vigente == true).ToList();
+            }
+            else
+            {
+                invitacionesAceptadas = new List<InvitacionLiga>();
+                invitacionesPendientesDetalle = new List<InvitacionLiga>();
+            }
+            
+            Console.WriteLine($"DEBUG: Invitaciones aceptadas: {invitacionesAceptadas.Count}, pendientes: {invitacionesPendientesDetalle.Count}");
+            ToastService.ShowInfo($"Debug: Aceptadas={invitacionesAceptadas.Count}, Pendientes={invitacionesPendientesDetalle.Count}");
+            
+
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DEBUG: Error al cargar detalles de invitaciones: {ex.Message}");
+            ToastService.ShowError("Error al cargar detalles de invitaciones: " + ex.Message);
+            
+            // Inicializar listas vacías en caso de error
+            invitacionesAceptadas = new List<InvitacionLiga>();
+            invitacionesPendientesDetalle = new List<InvitacionLiga>();
+        }
+    }
+    
+
+    
+    private void CerrarModalDetalles()
+    {
+        mostrarModalDetalles = false;
+        ligaDetalles = null;
+
+        invitacionesAceptadas = null;
+        invitacionesPendientesDetalle = null;
+        asignacionesDetalle = null;
+        usuariosDisponiblesDetalle = null;
+        StateHasChanged();
+    }
+
+    private async Task CargarAsignacionesDetalle(int idLiga)
+    {
+        try
+        {
+            cargandoAsignaciones = true;
+            StateHasChanged();
+
+            Console.WriteLine($"DEBUG: Cargando asignaciones para liga {idLiga}...");
+            
+            // Cargar asignaciones de equipos
+            asignacionesDetalle = await LigaService.GetAsignacionesEquiposAsync(idLiga);
+            Console.WriteLine($"DEBUG: Asignaciones cargadas: {asignacionesDetalle?.Count ?? -1}");
+            
+            // Cargar usuarios disponibles para asignar
+            usuariosDisponiblesDetalle = await LigaService.GetUsuariosDisponiblesParaTorneoAsync(idLiga);
+            Console.WriteLine($"DEBUG: Usuarios disponibles: {usuariosDisponiblesDetalle?.Count ?? -1}");
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ERROR: Error cargando asignaciones: {ex.Message}");
+            ToastService.ShowError("Error al cargar asignaciones de equipos");
+        }
+        finally
+        {
+            cargandoAsignaciones = false;
+            StateHasChanged();
+        }
+    }
+    
+    private void CerrarInscripciones()
+    {
+        if (ligaDetalles == null) return;
+        
+        try
+        {
+            // TODO: Implementar endpoint para cerrar inscripciones
+            ToastService.ShowInfo($"Cerrando inscripciones para {ligaDetalles.Nombre} - En desarrollo");
+            // ligaDetalles.Estado = "cerrada";
+            // await LigaService.CerrarInscripcionesAsync(ligaDetalles.IdLiga);
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al cerrar inscripciones: " + ex.Message);
+        }
+    }
+    
+    private void CancelarInvitacion(int idInvitacion)
+    {
+        try
+        {
+            // TODO: Implementar endpoint para cancelar invitación
+            ToastService.ShowInfo($"Cancelando invitación {idInvitacion} - En desarrollo");
+            // await LigaService.CancelarInvitacionAsync(idInvitacion);
+            // Recargar la lista cuando se implemente
+            // if (ligaDetalles != null)
+            // {
+            //     await CargarDetallesInvitaciones(ligaDetalles.IdLiga);
+            // }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al cancelar invitación: " + ex.Message);
+        }
+    }
+
+    private async Task AbrirModalInvitar(Liga liga)
+    {
+        ligaSeleccionada = liga;
+        mostrarModalInvitar = true;
+        emailInvitado = string.Empty;
+        tipoInvitacion = "jugador";
+        mensajePersonalizado = string.Empty;
+        
+        // Cargar invitaciones pendientes
+        await CargarInvitacionesPendientes(liga.IdLiga);
+        
+        StateHasChanged();
+    }
+
+    private void CerrarModalInvitar()
+    {
+        mostrarModalInvitar = false;
+        ligaSeleccionada = null;
+        invitacionesPendientes = null;
+        StateHasChanged();
+    }
+
+    private async Task CargarInvitacionesPendientes(int idLiga)
+    {
+        cargandoInvitaciones = true;
+        StateHasChanged();
+        
+        try
+        {
+            Console.WriteLine($"DEBUG: Cargando invitaciones para liga {idLiga}...");
+            invitacionesPendientes = await LigaService.GetInvitacionesLigaAsync(idLiga);
+            Console.WriteLine($"DEBUG: Invitaciones cargadas: {invitacionesPendientes?.Count ?? -1}");
+            ToastService.ShowInfo($"Debug: Se cargaron {invitacionesPendientes?.Count ?? 0} invitaciones para liga {idLiga}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DEBUG: Error al cargar invitaciones: {ex.Message}");
+            ToastService.ShowError("Error al cargar invitaciones: " + ex.Message);
+        }
+        finally
+        {
+            cargandoInvitaciones = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task EnviarInvitacion()
+    {
+        if (ligaSeleccionada == null || string.IsNullOrWhiteSpace(emailInvitado))
+            return;
+
+        procesandoInvitacion = true;
+        StateHasChanged();
+
+        try
+        {
+            var resultado = await LigaService.InvitarUsuarioALigaAsync(
+                ligaSeleccionada.IdLiga, 
+                emailInvitado.Trim(), 
+                tipoInvitacion,
+                string.IsNullOrWhiteSpace(mensajePersonalizado) ? null : mensajePersonalizado.Trim()
+            );
+
+            if (resultado != null)
+            {
+                ToastService.ShowSuccess($"Invitación enviada a {emailInvitado}");
+                emailInvitado = string.Empty;
+                mensajePersonalizado = string.Empty;
+                
+                // Recargar invitaciones pendientes
+                await CargarInvitacionesPendientes(ligaSeleccionada.IdLiga);
+            }
+            else
+            {
+                ToastService.ShowError("Error al enviar la invitación");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al enviar invitación: " + ex.Message);
+        }
+        finally
+        {
+            procesandoInvitacion = false;
+            StateHasChanged();
+        }
+    }
+
     private void BackToHome()
     {
         Navigation.NavigateTo("/members/home");
+    }
+
+    private void CrearNuevaLiga()
+    {
+        Navigation.NavigateTo("/members/create-tournament");
+    }
+
+    private void GestionarEquipos(int idLiga)
+    {
+        Navigation.NavigateTo($"/members/tournament-teams/{idLiga}");
+    }
+
+    private async Task IniciarLiga(int idLiga)
+    {
+        try
+        {
+            var confirmacion = await JSRuntime.InvokeAsync<bool>("confirm", 
+                "¿Estás seguro de que quieres iniciar esta liga? Una vez iniciada, no podrás modificar los equipos.");
+            
+            if (confirmacion)
+            {
+                await LigaService.IniciarTorneoAsync(idLiga);
+                ToastService.ShowSuccess("Liga iniciada correctamente");
+                await RefreshLigas(); // Recargar para mostrar cambios
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al iniciar liga: " + ex.Message);
+        }
+    }
+
+    private string GetLigaCardClass(string estado)
+    {
+        return estado.ToLower() switch
+        {
+            "abierta" => "border-success",
+            "iniciada" => "border-primary",
+            "finalizada" => "border-secondary",
+            "cerrada" => "border-warning",
+            _ => "border-light"
+        };
+    }
+
+    private string GetEstadoBadgeClass(string estado)
+    {
+        return estado.ToLower() switch
+        {
+            "abierta" => "bg-success",
+            "iniciada" => "bg-primary",
+            "finalizada" => "bg-secondary",
+            "cerrada" => "bg-warning",
+            _ => "bg-light text-dark"
+        };
+    }
+
+    private string GetEstadoInvitacionBadgeClass(string estado)
+    {
+        return estado.ToLower() switch
+        {
+            "pendiente" => "bg-warning",
+            "aceptada" => "bg-success",
+            "rechazada" => "bg-danger",
+            _ => "bg-secondary"
+        };
     }
 }

@@ -1,0 +1,405 @@
+@page "/members/tournament-teams/{IdTorneo:int}"
+@using FootballerWeb.Services
+@using FootballerWeb.DTOs
+@using FootballerWeb.Models
+@inject NavigationManager Navigation
+@inject LigaService LigaService
+@inject UsuarioService UsuarioService
+@inject ToastService ToastService
+@inject IJSRuntime JSRuntime
+
+<AuthGuard>
+    <div class="members-container">
+        <MembersHeader Title="Gestionar Equipos" IconClass="oi oi-people" />
+
+        <div class="members-content p-4">
+            <div class="container-fluid">
+                <!-- Header Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <h3 class="mb-1">
+                                    <i class="oi oi-people me-2 text-primary"></i>
+                                    @(torneoNombre ?? "Gestionar Equipos")
+                                </h3>
+                                <p class="text-muted">Asigna usuarios a equipos para el torneo</p>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-success" @onclick="GuardarAsignaciones" disabled="@guardando">
+                                    @if (guardando)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    else
+                                    {
+                                        <i class="oi oi-check me-1"></i>
+                                    }
+                                    Guardar Cambios
+                                </button>
+                                <button class="btn btn-outline-secondary" @onclick="Volver">
+                                    <i class="oi oi-arrow-left me-1"></i>Volver
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @if (cargando)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary mb-3"></div>
+                        <p class="text-muted">Cargando información del torneo...</p>
+                    </div>
+                }
+                else if (usuariosDisponibles == null || !usuariosDisponibles.Any())
+                {
+                    <div class="alert alert-info">
+                        <i class="oi oi-info me-2"></i>
+                        No hay usuarios disponibles para asignar a equipos en este torneo.
+                    </div>
+                }
+                else
+                {
+                    <!-- Usuarios sin asignar -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0">
+                                        <i class="oi oi-person me-2"></i>
+                                        Usuarios sin Asignar (@usuariosSinAsignar.Count)
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    @if (usuariosSinAsignar.Any())
+                                    {
+                                        <div class="row">
+                                            @foreach (var usuario in usuariosSinAsignar)
+                                            {
+                                                <div class="col-md-6 col-lg-4 mb-3">
+                                                    <div class="card bg-light">
+                                                        <div class="card-body py-2">
+                                                            <div class="d-flex align-items-center justify-content-between">
+                                                                <div>
+                                                                    <strong>@usuario.Nombre</strong>
+                                                                    <br>
+                                                                    <small class="text-muted">@usuario.Email</small>
+                                                                </div>
+                                                                <div class="btn-group-vertical btn-group-sm" style="width: 100px;">
+                                                                    @for (int i = 1; i <= cantidadEquipos; i++)
+                                                                    {
+                                                                        var equipoNum = i;
+                                                                        <button class="btn btn-outline-primary btn-sm mb-1" 
+                                                                                @onclick="() => AsignarUsuarioAEquipo(usuario.IdUsuario, equipoNum)"
+                                                                                @onclick:preventDefault="true">
+                                                                            Equipo @equipoNum
+                                                                        </button>
+                                                                    }
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted mb-0">Todos los usuarios han sido asignados a equipos.</p>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Equipos -->
+                    <div class="row">
+                        @for (int i = 1; i <= cantidadEquipos; i++)
+                        {
+                            var equipoNum = i;
+                            var usuariosEquipo = asignaciones.Where(a => a.NumeroEquipo == equipoNum).ToList();
+                            
+                            <div class="col-md-6 col-lg-4 mb-4">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h6 class="mb-0">
+                                            <i class="oi oi-people me-2"></i>
+                                            Equipo @equipoNum (@usuariosEquipo.Count usuarios)
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        @if (usuariosEquipo.Any())
+                                        {
+                                            @foreach (var asignacion in usuariosEquipo)
+                                            {
+                                                <div class="d-flex align-items-center justify-content-between mb-2 p-2 bg-light rounded">
+                                                    <div>
+                                                        <strong>@asignacion.NombreUsuario</strong>
+                                                        <br>
+                                                        <small class="text-muted">@asignacion.EmailUsuario</small>
+                                                    </div>
+                                                    <button class="btn btn-outline-danger btn-sm" 
+                                                            @onclick="() => RemoverUsuarioDeEquipo(asignacion.IdUsuario)">
+                                                        <i class="oi oi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <p class="text-muted mb-0">
+                                                <i class="oi oi-info me-1"></i>
+                                                Sin usuarios asignados
+                                            </p>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</AuthGuard>
+
+<style>
+    .members-container {
+        min-height: 100vh;
+        background: #f8f9fa;
+    }
+
+    .members-content {
+        padding: 2rem 0;
+    }
+
+    .card {
+        transition: transform 0.2s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+    }
+
+    .dropdown-toggle::after {
+        margin-left: 0.5em;
+    }
+</style>
+
+@code {
+    [Parameter] public int IdTorneo { get; set; }
+
+    // Estado de carga
+    private bool cargando = true;
+    private bool guardando = false;
+
+    // Datos del torneo
+    private string? torneoNombre;
+    private int cantidadEquipos = 2; // Default
+
+    // Usuarios y asignaciones
+    private List<UsuarioSimple> usuariosDisponibles = new();
+    private List<AsignacionEquipo> asignaciones = new();
+    
+    // Usuarios sin asignar (computed)
+    private List<UsuarioSimple> usuariosSinAsignar => 
+        usuariosDisponibles.Where(u => !asignaciones.Any(a => a.IdUsuario == u.IdUsuario)).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine($"DEBUG: OnInitializedAsync iniciado con IdTorneo: {IdTorneo}");
+        
+        await CargarDatosTorneo();
+        await CargarUsuariosDisponibles();
+        await CargarAsignacionesActuales();
+        
+        Console.WriteLine($"DEBUG: OnInitializedAsync completado");
+        cargando = false;
+        StateHasChanged();
+    }
+
+    private async Task CargarDatosTorneo()
+    {
+        try
+        {
+            Console.WriteLine($"DEBUG: Cargando datos del torneo ID: {IdTorneo}");
+            var torneo = await LigaService.GetTorneoInfoAsync(IdTorneo);
+            Console.WriteLine($"DEBUG: Torneo cargado - Nombre: {torneo?.Nombre}, Equipos: {torneo?.CantidadEquipos}");
+            
+            torneoNombre = torneo?.Nombre ?? "Torneo desconocido";
+            cantidadEquipos = torneo?.CantidadEquipos ?? 0;
+            
+            Console.WriteLine($"DEBUG: Variables asignadas - torneoNombre: {torneoNombre}, cantidadEquipos: {cantidadEquipos}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DEBUG: Error cargando datos del torneo: {ex.Message}");
+            Console.WriteLine($"DEBUG: StackTrace: {ex.StackTrace}");
+            ToastService.ShowError("Error al cargar información del torneo");
+        }
+    }
+
+    private async Task CargarUsuariosDisponibles()
+    {
+        try
+        {
+            Console.WriteLine($"DEBUG: Cargando usuarios disponibles para torneo {IdTorneo}");
+            var usuariosDto = await LigaService.GetUsuariosDisponiblesParaTorneoAsync(IdTorneo);
+            Console.WriteLine($"DEBUG: UsuariosDto recibidos: {usuariosDto?.Count ?? 0}");
+            
+            usuariosDisponibles = usuariosDto?.Select(u => new UsuarioSimple
+            {
+                IdUsuario = u.IdUsuario,
+                Nombre = u.Nombre,
+                Email = u.Email
+            }).ToList() ?? new List<UsuarioSimple>();
+            
+            Console.WriteLine($"DEBUG: Usuarios disponibles procesados: {usuariosDisponibles?.Count ?? 0}");
+            
+            if (usuariosDisponibles?.Any() == true)
+            {
+                foreach (var usuario in usuariosDisponibles)
+                {
+                    Console.WriteLine($"DEBUG: Usuario disponible - ID: {usuario.IdUsuario}, Nombre: {usuario.Nombre}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DEBUG: Error cargando usuarios: {ex.Message}");
+            Console.WriteLine($"DEBUG: StackTrace: {ex.StackTrace}");
+            ToastService.ShowError("Error al cargar usuarios disponibles");
+        }
+    }
+
+    private async Task CargarAsignacionesActuales()
+    {
+        try
+        {
+            var asignacionesDto = await LigaService.GetAsignacionesEquiposAsync(IdTorneo);
+            asignaciones = asignacionesDto.Select(a => new AsignacionEquipo
+            {
+                IdUsuario = a.IdUsuario,
+                NombreUsuario = a.NombreUsuario,
+                EmailUsuario = a.EmailUsuario,
+                NumeroEquipo = a.NumeroEquipo
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando asignaciones: {ex.Message}");
+            ToastService.ShowError("Error al cargar asignaciones actuales");
+        }
+    }
+
+    private void AsignarUsuarioAEquipo(int idUsuario, int numeroEquipo)
+    {
+        Console.WriteLine($"DEBUG: Intentando asignar usuario {idUsuario} al equipo {numeroEquipo}");
+        Console.WriteLine($"DEBUG: Usuarios disponibles: {usuariosDisponibles?.Count ?? 0}");
+        Console.WriteLine($"DEBUG: Asignaciones actuales: {asignaciones?.Count ?? 0}");
+        
+        try
+        {
+            // Remover asignación previa si existe
+            var removidas = asignaciones?.RemoveAll(a => a.IdUsuario == idUsuario) ?? 0;
+            Console.WriteLine($"DEBUG: Asignaciones previas removidas: {removidas}");
+            
+            // Encontrar el usuario
+            var usuario = usuariosDisponibles?.FirstOrDefault(u => u.IdUsuario == idUsuario);
+            Console.WriteLine($"DEBUG: Usuario encontrado: {usuario?.Nombre ?? "null"}");
+            
+            if (usuario != null)
+            {
+                var nuevaAsignacion = new AsignacionEquipo
+                {
+                    IdUsuario = idUsuario,
+                    NombreUsuario = usuario.Nombre,
+                    EmailUsuario = usuario.Email,
+                    NumeroEquipo = numeroEquipo
+                };
+                
+                asignaciones?.Add(nuevaAsignacion);
+                Console.WriteLine($"DEBUG: Asignación agregada. Total asignaciones: {asignaciones?.Count ?? 0}");
+                
+                ToastService.ShowSuccess($"{usuario.Nombre} asignado al Equipo {numeroEquipo}");
+                StateHasChanged();
+            }
+            else
+            {
+                Console.WriteLine($"DEBUG: ERROR - Usuario con ID {idUsuario} no encontrado en usuarios disponibles");
+                ToastService.ShowError($"Usuario con ID {idUsuario} no encontrado");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DEBUG: ERROR en AsignarUsuarioAEquipo: {ex.Message}");
+            ToastService.ShowError($"Error al asignar usuario: {ex.Message}");
+        }
+    }
+
+    private void RemoverUsuarioDeEquipo(int idUsuario)
+    {
+        var asignacion = asignaciones.FirstOrDefault(a => a.IdUsuario == idUsuario);
+        if (asignacion != null)
+        {
+            asignaciones.Remove(asignacion);
+            ToastService.ShowInfo($"{asignacion.NombreUsuario} removido del equipo");
+            StateHasChanged();
+        }
+    }
+
+    private async Task GuardarAsignaciones()
+    {
+        guardando = true;
+        try
+        {
+            // Convertir a DTOs para enviar al backend
+            var asignacionesDto = asignaciones.Select(a => new FootballerWeb.Services.AsignacionEquipoDto
+            {
+                IdUsuario = a.IdUsuario,
+                NombreUsuario = a.NombreUsuario,
+                EmailUsuario = a.EmailUsuario,
+                NumeroEquipo = a.NumeroEquipo
+            }).ToList();
+
+            await LigaService.GuardarAsignacionesEquiposAsync(IdTorneo, asignacionesDto);
+            
+            ToastService.ShowSuccess("Asignaciones guardadas correctamente");
+            
+            // Opcional: regresar a la página anterior
+            await Task.Delay(1000);
+            Volver();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error guardando asignaciones: {ex.Message}");
+            ToastService.ShowError("Error al guardar asignaciones: " + ex.Message);
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/members/my-tournaments-playing");
+    }
+
+    // Clases auxiliares
+    public class UsuarioSimple
+    {
+        public int IdUsuario { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public class AsignacionEquipo
+    {
+        public int IdUsuario { get; set; }
+        public string NombreUsuario { get; set; } = string.Empty;
+        public string EmailUsuario { get; set; } = string.Empty;
+        public int NumeroEquipo { get; set; }
+    }
+}

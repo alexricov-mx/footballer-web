@@ -1,0 +1,139 @@
+@using FootballerWeb.Services
+@using FootballerWeb.Shared.Components
+@inject IJSRuntime JSRuntime
+@inject IJwtClientService JwtClientService
+
+<div class="members-header">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center">
+                    @if (!string.IsNullOrEmpty(userPicture))
+                    {
+                        <img src="@userPicture" alt="Avatar" class="user-avatar me-3" 
+                             referrerpolicy="no-referrer" crossorigin="anonymous" 
+                             onerror="this.src='@GetDefaultAvatar()'" />
+                    }
+                    else
+                    {
+                        <div class="user-avatar-placeholder me-3">
+                            <i class="oi oi-person"></i>
+                        </div>
+                    }
+                    <div>
+                        <h1 class="members-title mb-1">
+                            <i class="@IconClass text-primary me-2"></i>
+                            @Title
+                        </h1>
+                        <p class="members-subtitle mb-2">Bienvenido @userName</p>
+                        <div class="user-status">
+                            <span class="badge bg-success">✅ Autenticado</span>
+                            <span class="text-muted ms-2">@userEmail</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <LogoutButton 
+                    ButtonText="Cerrar Sesión" 
+                    CssClass="btn btn-outline-light"
+                    ShowConfirmation="true" 
+                    ConfirmationMessage="¿Estás seguro de que deseas cerrar sesión? Perderás el acceso al área de miembros." />
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .members-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 0;
+    }
+
+    .user-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        object-fit: cover;
+    }
+
+    .user-avatar-placeholder {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .members-title {
+        font-size: 2rem;
+        font-weight: 600;
+        margin-bottom: 0;
+    }
+
+    .members-subtitle {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        margin-bottom: 0;
+    }
+
+    .user-status {
+        margin-top: 0.5rem;
+    }
+
+    .user-status .badge {
+        font-size: 0.75rem;
+    }
+
+    .user-status .text-muted {
+        color: rgba(255, 255, 255, 0.7) !important;
+    }
+</style>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Área de Miembros";
+    [Parameter] public string IconClass { get; set; } = "oi oi-shield";
+
+    private string userName = string.Empty;
+    private string userEmail = string.Empty;
+    private string userPicture = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserData();
+    }
+
+    private async Task LoadUserData()
+    {
+        try
+        {
+            var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+            if (!string.IsNullOrEmpty(token) && JwtClientService.IsTokenValid(token))
+            {
+                userName = JwtClientService.GetUserNameFromToken(token) ?? "Usuario";
+                userEmail = JwtClientService.GetUserEmailFromToken(token) ?? "";
+                
+                // Obtener la foto de perfil del token
+                var claims = JwtClientService.GetAllClaimsFromToken(token);
+                userPicture = claims?.FirstOrDefault(c => c.Key.Contains("picture") || c.Key.Contains("Foto")).Value ?? "";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando datos del usuario en MembersHeader: {ex.Message}");
+        }
+    }
+
+    private string GetDefaultAvatar()
+    {
+        // SVG base64 de un avatar por defecto
+        return "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMzAiIGZpbGw9IiNEQ0RDREMiLz4KPHN2ZyB4PSIxNSIgeT0iMTUiIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRkZGIj4KPHBhdGggZD0iTTEyIDJDMTMuMSAyIDE0IDIuOSAxNCA0QzE0IDUuMSAxMy4xIDYgMTIgNkMxMC45IDYgMTAgNS4xIDEwIDRDMTAgMi45IDEwLjkgMiAxMiAyWk0yMSAyMFYyMkgzVjIwQzMgMTcuNzkgNi41OCAxNiAxMiAxNkMxNy40MiAxNiAyMSAxNy43OSAyMSAyMFoiLz4KPC9zdmc+Cjwvc3ZnPgo=";
+    }
+}

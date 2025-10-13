@@ -258,7 +258,7 @@ public class UsuarioService
         }
     }
 
-    // Obtener invitaciones pendientes
+    // Obtener invitaciones pendientes de usuario
     public async Task<List<InvitacionPendiente>> GetInvitacionesPendientesAsync()
     {
         try
@@ -289,6 +289,164 @@ public class UsuarioService
         {
             _logger.LogError(ex, "Error al obtener las invitaciones pendientes");
             return new List<InvitacionPendiente>();
+        }
+    }
+
+    // Obtener invitaciones de liga pendientes del usuario actual
+    public async Task<List<InvitacionLiga>> GetMisInvitacionesLigaAsync()
+    {
+        try
+        {
+            var token = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+            if (string.IsNullOrEmpty(token))
+                return new List<InvitacionLiga>();
+
+            _httpClient.DefaultRequestHeaders.Authorization = 
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var response = await _httpClient.GetAsync("https://localhost:8090/api/usuarios/mis-invitaciones-liga");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var invitaciones = JsonSerializer.Deserialize<List<InvitacionLiga>>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                return invitaciones ?? new List<InvitacionLiga>();
+            }
+            
+            _logger.LogWarning("Error al obtener mis invitaciones de liga: {StatusCode}", response.StatusCode);
+            return new List<InvitacionLiga>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener mis invitaciones de liga");
+            return new List<InvitacionLiga>();
+        }
+    }
+
+    // Aceptar invitación de liga
+    public async Task<bool> AceptarInvitacionLigaAsync(string codigoInvitacion)
+    {
+        try
+        {
+            var token = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+            if (string.IsNullOrEmpty(token))
+                return false;
+
+            _httpClient.DefaultRequestHeaders.Authorization = 
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var request = new { CodigoInvitacion = codigoInvitacion };
+
+            var response = await _httpClient.PostAsJsonAsync("https://localhost:8090/api/usuarios/aceptar-invitacion-liga", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+            
+            _logger.LogWarning("Error al aceptar invitación de liga {Codigo}: {StatusCode}", codigoInvitacion, response.StatusCode);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al aceptar invitación de liga {Codigo}", codigoInvitacion);
+            return false;
+        }
+    }
+
+    // Rechazar invitación de liga
+    public async Task<bool> RechazarInvitacionLigaAsync(string codigoInvitacion)
+    {
+        try
+        {
+            var token = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+            if (string.IsNullOrEmpty(token))
+                return false;
+
+            _httpClient.DefaultRequestHeaders.Authorization = 
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var request = new { CodigoInvitacion = codigoInvitacion };
+
+            var response = await _httpClient.PostAsJsonAsync("https://localhost:8090/api/usuarios/rechazar-invitacion-liga", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+            
+            _logger.LogWarning("Error al rechazar invitación de liga {Codigo}: {StatusCode}", codigoInvitacion, response.StatusCode);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al rechazar invitación de liga {Codigo}", codigoInvitacion);
+            return false;
+        }
+    }
+
+    // Aceptar invitación de usuario
+    public async Task<bool> AceptarInvitacionUsuarioAsync(string codigoInvitacion)
+    {
+        try
+        {
+            var token = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+            if (string.IsNullOrEmpty(token))
+                return false;
+
+            _httpClient.DefaultRequestHeaders.Authorization = 
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var request = new { CodigoInvitacion = codigoInvitacion };
+
+            var response = await _httpClient.PostAsJsonAsync("https://localhost:8090/api/usuarios/aceptar-invitacion-usuario", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+            
+            _logger.LogWarning("Error al aceptar invitación de usuario {Codigo}: {StatusCode}", codigoInvitacion, response.StatusCode);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al aceptar invitación de usuario {Codigo}", codigoInvitacion);
+            return false;
+        }
+    }
+
+    // Rechazar invitación de usuario
+    public async Task<bool> RechazarInvitacionUsuarioAsync(string codigoInvitacion)
+    {
+        try
+        {
+            var token = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
+            if (string.IsNullOrEmpty(token))
+                return false;
+
+            _httpClient.DefaultRequestHeaders.Authorization = 
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+            var request = new { CodigoInvitacion = codigoInvitacion };
+
+            var response = await _httpClient.PostAsJsonAsync("https://localhost:8090/api/usuarios/rechazar-invitacion-usuario", request);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
+            
+            _logger.LogWarning("Error al rechazar invitación de usuario {Codigo}: {StatusCode}", codigoInvitacion, response.StatusCode);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al rechazar invitación de usuario {Codigo}", codigoInvitacion);
+            return false;
         }
     }
 }

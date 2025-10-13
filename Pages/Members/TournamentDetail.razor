@@ -1,0 +1,524 @@
+@page "/members/tournament-detail/{IdTorneo:int}"
+@using FootballerWeb.Services
+@using FootballerWeb.Shared.Components
+@using FootballerWeb.DTOs
+@using FootballerWeb.Models
+@inject NavigationManager Navigation
+@inject LigaService LigaService
+@inject UsuarioService UsuarioService
+@inject ToastService ToastService
+@inject IJSRuntime JSRuntime
+
+<AuthGuard>
+    <div class="members-container">
+        <MembersHeader Title="@(torneoInfo?.Nombre ?? "Detalles del Torneo")" IconClass="oi oi-trophy" />
+
+        <div class="members-content p-4">
+            <div class="container-fluid">
+                @if (cargando)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary mb-3"></div>
+                        <p class="text-muted">Cargando información del torneo...</p>
+                    </div>
+                }
+                else if (torneoInfo == null)
+                {
+                    <div class="alert alert-danger">
+                        <i class="oi oi-warning me-2"></i>
+                        No se pudo cargar la información del torneo.
+                    </div>
+                }
+                else
+                {
+                    <!-- Header con información del torneo -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card bg-gradient-primary text-white">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h2 class="mb-1">@torneoInfo.Nombre</h2>
+                                            <p class="mb-2 opacity-75">@torneoInfo.Descripcion</p>
+                                            <div class="d-flex gap-3">
+                                                <span class="badge bg-light text-dark">
+                                                    <i class="oi oi-people me-1"></i>
+                                                    @torneoInfo.CantidadEquipos equipos
+                                                </span>
+                                                <span class="badge @GetBadgeClass(torneoInfo.Estado)">
+                                                    @GetEstadoTexto(torneoInfo.Estado)
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <button class="btn btn-light" @onclick="Volver">
+                                                <i class="oi oi-arrow-left me-1"></i>
+                                                Volver
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Acciones rápidas para organizadores -->
+                    @if (torneoInfo.EsOrganizador && torneoInfo.Estado == "pendiente")
+                    {
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card border-warning">
+                                    <div class="card-body">
+                                        <h5 class="card-title text-warning">
+                                            <i class="oi oi-cog me-2"></i>
+                                            Acciones de Organización
+                                        </h5>
+                                        <p class="card-text">Este torneo está pendiente. Puedes gestionar equipos e iniciarlo cuando esté listo.</p>
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-warning" @onclick="IrAGestionarEquipos">
+                                                <i class="oi oi-people me-1"></i>
+                                                Gestionar Equipos
+                                            </button>
+                                            <button class="btn btn-success" @onclick="IniciarTorneo">
+                                                <i class="oi oi-media-play me-1"></i>
+                                                Iniciar Torneo
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Equipos del torneo -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h5 class="mb-0">
+                                            <i class="oi oi-people me-2"></i>
+                                            Equipos del Torneo
+                                        </h5>
+                                        @if (torneoInfo.EsOrganizador && torneoInfo.Estado == "pendiente")
+                                        {
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="MostrarModalAsignacion">
+                                                <i class="oi oi-plus me-1"></i>
+                                                Asignar Usuario
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    @if (equipos?.Any() == true)
+                                    {
+                                        <div class="row">
+                                            @foreach (var equipo in equipos)
+                                            {
+                                                <div class="col-md-6 col-lg-4 mb-3">
+                                                    <div class="card h-100 @(equipo.Usuarios?.Any() == true ? "" : "border-dashed")">
+                                                        <div class="card-header @(equipo.Usuarios?.Any() == true ? "bg-primary text-white" : "bg-light")">
+                                                            <h6 class="mb-0">
+                                                                <i class="oi oi-people me-2"></i>
+                                                                Equipo @equipo.NumeroEquipo
+                                                                <small class="ms-2">(@(equipo.Usuarios?.Count ?? 0) usuarios)</small>
+                                                            </h6>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            @if (equipo.Usuarios?.Any() == true)
+                                                            {
+                                                                @foreach (var usuario in equipo.Usuarios)
+                                                                {
+                                                                    <div class="d-flex align-items-center justify-content-between mb-2 p-2 bg-light rounded">
+                                                                        <div>
+                                                                            <strong>@usuario.Nombre</strong>
+                                                                            <br>
+                                                                            <small class="text-muted">@usuario.Email</small>
+                                                                        </div>
+                                                                        @if (torneoInfo.EsOrganizador && torneoInfo.Estado == "pendiente")
+                                                                        {
+                                                                            <button class="btn btn-sm btn-outline-danger" 
+                                                                                    @onclick="() => RemoverUsuarioDeEquipo(usuario.IdUsuario)">
+                                                                                <i class="oi oi-trash"></i>
+                                                                            </button>
+                                                                        }
+                                                                    </div>
+                                                                }
+                                                            }
+                                                            else
+                                                            {
+                                                                <div class="text-center text-muted py-3">
+                                                                    <i class="oi oi-info display-6 mb-2"></i>
+                                                                    <p class="mb-0">Sin usuarios asignados</p>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-center py-4">
+                                            <i class="oi oi-info display-4 text-muted mb-3"></i>
+                                            <p class="text-muted">No hay equipos configurados para este torneo.</p>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Usuarios disponibles para asignar (solo para organizadores) -->
+                    @if (torneoInfo.EsOrganizador && torneoInfo.Estado == "pendiente" && usuariosDisponibles?.Any() == true)
+                    {
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0">
+                                            <i class="oi oi-person me-2"></i>
+                                            Usuarios Disponibles para Asignar (@usuariosDisponibles.Count)
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            @foreach (var usuario in usuariosDisponibles)
+                                            {
+                                                <div class="col-md-6 col-lg-4 mb-3">
+                                                    <div class="card bg-light">
+                                                        <div class="card-body py-2">
+                                                            <div class="d-flex align-items-center justify-content-between">
+                                                                <div>
+                                                                    <strong>@usuario.Nombre</strong>
+                                                                    <br>
+                                                                    <small class="text-muted">@usuario.Email</small>
+                                                                </div>
+                                                                <div class="dropdown">
+                                                                    <button class="btn btn-outline-primary btn-sm dropdown-toggle" 
+                                                                            type="button" data-bs-toggle="dropdown">
+                                                                        Asignar
+                                                                    </button>
+                                                                    <ul class="dropdown-menu">
+                                                                        @for (int i = 1; i <= torneoInfo.CantidadEquipos; i++)
+                                                                        {
+                                                                            var equipoNum = i;
+                                                                            <li>
+                                                                                <a class="dropdown-item" href="#" 
+                                                                                   @onclick="() => AsignarUsuarioAEquipo(usuario.IdUsuario, equipoNum)">
+                                                                                    Equipo @equipoNum
+                                                                                </a>
+                                                                            </li>
+                                                                        }
+                                                                    </ul>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</AuthGuard>
+
+<style>
+    .members-container {
+        min-height: 100vh;
+        background: #f8f9fa;
+    }
+
+    .members-content {
+        padding: 2rem 0;
+    }
+
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    }
+
+    .border-dashed {
+        border: 2px dashed #dee2e6 !important;
+    }
+
+    .card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .dropdown-toggle::after {
+        margin-left: 0.5em;
+    }
+</style>
+
+@code {
+    [Parameter] public int IdTorneo { get; set; }
+
+    // Estado de carga
+    private bool cargando = true;
+
+    // Datos del torneo
+    private FootballerWeb.Services.TorneoInfoDto? torneoInfo;
+    private List<EquipoDetalle> equipos = new();
+    private List<FootballerWeb.Services.UsuarioSimpleDto> usuariosDisponibles = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatosTorneo();
+        await CargarEquipos();
+        await CargarUsuariosDisponibles(); // Debe ir después de cargar equipos para filtrar correctamente
+        cargando = false;
+    }
+
+    private async Task CargarDatosTorneo()
+    {
+        try
+        {
+            torneoInfo = await LigaService.GetTorneoInfoAsync(IdTorneo);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando datos del torneo: {ex.Message}");
+            ToastService.ShowError("Error al cargar información del torneo");
+        }
+    }
+
+    private async Task CargarEquipos()
+    {
+        try
+        {
+            var equiposDto = await LigaService.GetEquiposDetalleAsync(IdTorneo);
+            equipos = equiposDto.Select(e => new EquipoDetalle
+            {
+                NumeroEquipo = e.NumeroEquipo,
+                Usuarios = e.Usuarios.Select(u => new UsuarioEquipo
+                {
+                    IdUsuario = u.IdUsuario,
+                    Nombre = u.Nombre,
+                    Email = u.Email
+                }).ToList()
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando equipos: {ex.Message}");
+            ToastService.ShowError("Error al cargar equipos");
+        }
+    }
+
+    private async Task CargarUsuariosDisponibles()
+    {
+        try
+        {
+            if (torneoInfo?.EsOrganizador == true && torneoInfo.Estado == "pendiente")
+            {
+                var todosLosUsuarios = await LigaService.GetUsuariosDisponiblesParaTorneoAsync(IdTorneo);
+                
+                // Filtrar usuarios que ya están asignados a equipos
+                var usuariosAsignados = equipos.SelectMany(e => e.Usuarios.Select(u => u.IdUsuario)).ToList();
+                usuariosDisponibles = todosLosUsuarios.Where(u => !usuariosAsignados.Contains(u.IdUsuario)).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando usuarios disponibles: {ex.Message}");
+            ToastService.ShowError("Error al cargar usuarios disponibles");
+        }
+    }
+
+    private async Task AsignarUsuarioAEquipo(int idUsuario, int numeroEquipo)
+    {
+        try
+        {
+            // Encontrar el usuario
+            var usuario = usuariosDisponibles.FirstOrDefault(u => u.IdUsuario == idUsuario);
+            if (usuario == null) return;
+
+            // Encontrar el equipo
+            var equipo = equipos.FirstOrDefault(e => e.NumeroEquipo == numeroEquipo);
+            if (equipo == null) return;
+
+            // Remover el usuario de cualquier equipo previo
+            foreach (var eq in equipos)
+            {
+                eq.Usuarios.RemoveAll(u => u.IdUsuario == idUsuario);
+            }
+
+            // Agregar al nuevo equipo
+            equipo.Usuarios.Add(new UsuarioEquipo
+            {
+                IdUsuario = usuario.IdUsuario,
+                Nombre = usuario.Nombre,
+                Email = usuario.Email
+            });
+
+            // Remover de disponibles
+            usuariosDisponibles.Remove(usuario);
+
+            // Guardar cambios en el backend
+            await GuardarAsignacionesAsync();
+
+            // Recargar datos para sincronizar con el backend
+            await CargarEquipos();
+            await CargarUsuariosDisponibles();
+
+            ToastService.ShowSuccess($"{usuario.Nombre} asignado al Equipo {numeroEquipo}");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al asignar usuario: " + ex.Message);
+        }
+    }
+
+    private async Task RemoverUsuarioDeEquipo(int idUsuario)
+    {
+        try
+        {
+            // Buscar en qué equipo está el usuario
+            UsuarioEquipo? usuarioRemovido = null;
+            foreach (var equipo in equipos)
+            {
+                usuarioRemovido = equipo.Usuarios.FirstOrDefault(u => u.IdUsuario == idUsuario);
+                if (usuarioRemovido != null)
+                {
+                    equipo.Usuarios.Remove(usuarioRemovido);
+                    break;
+                }
+            }
+
+            if (usuarioRemovido != null)
+            {
+                // Agregar de vuelta a disponibles
+                usuariosDisponibles.Add(new FootballerWeb.Services.UsuarioSimpleDto
+                {
+                    IdUsuario = usuarioRemovido.IdUsuario,
+                    Nombre = usuarioRemovido.Nombre,
+                    Email = usuarioRemovido.Email
+                });
+
+                // Guardar cambios en el backend
+                await GuardarAsignacionesAsync();
+
+                // Recargar datos para sincronizar con el backend
+                await CargarEquipos();
+                await CargarUsuariosDisponibles();
+
+                ToastService.ShowInfo($"{usuarioRemovido.Nombre} removido del equipo");
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al remover usuario: " + ex.Message);
+        }
+    }
+
+    private async Task IniciarTorneo()
+    {
+        try
+        {
+            var confirmacion = await JSRuntime.InvokeAsync<bool>("confirm", 
+                "¿Estás seguro de que quieres iniciar este torneo? Una vez iniciado, no podrás modificar los equipos.");
+            
+            if (confirmacion)
+            {
+                await LigaService.IniciarTorneoAsync(IdTorneo);
+                ToastService.ShowSuccess("Torneo iniciado correctamente");
+                await CargarDatosTorneo(); // Recargar para mostrar cambios
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al iniciar torneo: " + ex.Message);
+        }
+    }
+
+    private void IrAGestionarEquipos()
+    {
+        Navigation.NavigateTo($"/members/tournament-teams/{IdTorneo}");
+    }
+
+    private void MostrarModalAsignacion()
+    {
+        // TODO: Implementar modal para asignación rápida
+        ToastService.ShowInfo("Funcionalidad de modal en desarrollo. Usa la sección de usuarios disponibles abajo.");
+    }
+
+    private async Task GuardarAsignacionesAsync()
+    {
+        try
+        {
+            // Convertir equipos a formato DTO para enviar al backend
+            var asignaciones = new List<FootballerWeb.Services.AsignacionEquipoDto>();
+            
+            foreach (var equipo in equipos)
+            {
+                foreach (var usuario in equipo.Usuarios)
+                {
+                    asignaciones.Add(new FootballerWeb.Services.AsignacionEquipoDto
+                    {
+                        IdUsuario = usuario.IdUsuario,
+                        NombreUsuario = usuario.Nombre,
+                        EmailUsuario = usuario.Email,
+                        NumeroEquipo = equipo.NumeroEquipo
+                    });
+                }
+            }
+
+            await LigaService.GuardarAsignacionesEquiposAsync(IdTorneo, asignaciones);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error guardando asignaciones: {ex.Message}");
+            ToastService.ShowError("Error al guardar asignaciones: " + ex.Message);
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/members/my-tournaments-playing");
+    }
+
+    // Métodos de estilo
+    private string GetBadgeClass(string estado) => estado switch
+    {
+        "activo" => "bg-success",
+        "finalizado" => "bg-secondary",
+        "pendiente" => "bg-warning text-dark",
+        _ => "bg-primary"
+    };
+
+    private string GetEstadoTexto(string estado) => estado switch
+    {
+        "activo" => "En Curso",
+        "finalizado" => "Finalizado",
+        "pendiente" => "Pendiente",
+        _ => "Desconocido"
+    };
+
+    // Clases auxiliares
+    public class EquipoDetalle
+    {
+        public int NumeroEquipo { get; set; }
+        public List<UsuarioEquipo> Usuarios { get; set; } = new();
+    }
+
+    public class UsuarioEquipo
+    {
+        public int IdUsuario { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+    }
+}

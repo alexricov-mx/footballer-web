@@ -1,0 +1,555 @@
+@page "/members/my-tournaments-playing"
+@using FootballerWeb.Services
+@using FootballerWeb.Shared.Components
+@using FootballerWeb.DTOs
+@using FootballerWeb.Models
+@inject NavigationManager Navigation
+@inject LigaService LigaService
+@inject EquipoService EquipoService
+@inject ToastService ToastService
+@inject IJSRuntime JSRuntime
+
+<AuthGuard>
+    <div class="members-container">
+        <MembersHeader Title="Mis Torneos" IconClass="oi oi-badge" />
+
+        <div class="members-content p-4">
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="d-flex align-items-center justify-content-between mb-4">
+                            <div>
+                                <h3 class="mb-1">
+                                    <i class="oi oi-badge me-2 text-primary"></i>
+                                    Mis Participaciones
+                                </h3>
+                                <p class="text-muted">Torneos donde participo como jugador</p>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary" @onclick="RefreshTorneos">
+                                    <i class="oi oi-reload me-1"></i>Actualizar
+                                </button>
+                                <button class="btn btn-outline-secondary" @onclick="BackToHome">
+                                    <i class="oi oi-arrow-left me-2"></i>Regresar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                <!-- Filtros -->
+                <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body py-3">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="btn-group" role="group">
+                                    <input type="radio" class="btn-check" name="filtroEstado" id="todos" 
+                                           checked="@(filtroSeleccionado == "todos")" @onchange="@(() => CambiarFiltro("todos"))">
+                                    <label class="btn btn-outline-primary" for="todos">
+                                        <i class="oi oi-list me-1"></i>Todos (@(torneosOriginales?.Count ?? 0))
+                                    </label>
+
+                                    <input type="radio" class="btn-check" name="filtroEstado" id="activos" 
+                                           checked="@(filtroSeleccionado == "activos")" @onchange="@(() => CambiarFiltro("activos"))">
+                                    <label class="btn btn-outline-success" for="activos">
+                                        <i class="oi oi-media-play me-1"></i>Activos (@conteoActivos)
+                                    </label>
+
+                                    <input type="radio" class="btn-check" name="filtroEstado" id="finalizados" 
+                                           checked="@(filtroSeleccionado == "finalizados")" @onchange="@(() => CambiarFiltro("finalizados"))">
+                                    <label class="btn btn-outline-secondary" for="finalizados">
+                                        <i class="oi oi-check me-1"></i>Finalizados (@conteoFinalizados)
+                                    </label>
+
+                                    <input type="radio" class="btn-check" name="filtroEstado" id="proximos" 
+                                           checked="@(filtroSeleccionado == "proximos")" @onchange="@(() => CambiarFiltro("proximos"))">
+                                    <label class="btn btn-outline-warning" for="proximos">
+                                        <i class="oi oi-clock me-1"></i>Próximos (@conteoProximos)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <small class="text-muted">
+                                    <i class="oi oi-info me-1"></i>
+                                    Última actualización: @ultimaActualizacion.ToString("HH:mm:ss")
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de Torneos -->
+        <div class="row">
+            <div class="col-12">
+                @if (cargandoTorneos)
+                {
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <h5 class="text-muted">Cargando mis torneos...</h5>
+                        <p class="text-muted">Obteniendo información de tus participaciones</p>
+                    </div>
+                }
+                else if (torneosFiltrados?.Any() == true)
+                {
+                    <div class="row">
+                        @foreach (var torneo in torneosFiltrados)
+                        {
+                            <div class="col-lg-6 col-xl-4 mb-4">
+                                <div class="card h-100 shadow-sm border-0 tournament-card @GetCardClass(torneo.Estado)">
+                                    <div class="card-header bg-transparent border-0 pb-0">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <h5 class="card-title mb-1 text-truncate" title="@torneo.Nombre">
+                                                    @torneo.Nombre
+                                                </h5>
+                                                <small class="text-muted">
+                                                    <i class="oi oi-calendar me-1"></i>
+                                                    @torneo.FechaInicio.ToString("dd/MM/yyyy") - @torneo.FechaFin.ToString("dd/MM/yyyy")
+                                                </small>
+                                            </div>
+                                            <span class="badge @GetBadgeClass(torneo.Estado) ms-2">
+                                                @GetEstadoTexto(torneo.Estado)
+                                            </span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="card-body pt-2">
+                                        <!-- Mi Equipo -->
+                                        <div class="mb-3">
+                                            <div class="d-flex align-items-center">
+                                                <div class="me-2">
+                                                    <div class="team-avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" 
+                                                         style="width: 40px; height: 40px; font-size: 16px; font-weight: bold;">
+                                                        @(torneo.MiEquipo?.Substring(0, 2).ToUpperInvariant() ?? "??")
+                                                    </div>
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <div class="fw-semibold text-primary">@(torneo.MiEquipo ?? "Equipo no asignado")</div>
+                                                    <small class="text-muted">Mi equipo</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Estadísticas Rápidas -->
+                                        <div class="row text-center mb-3">
+                                            <div class="col-4">
+                                                <div class="stat-box">
+                                                    <div class="h6 mb-0 text-success">@torneo.PartidosJugados</div>
+                                                    <small class="text-muted">Jugados</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="stat-box">
+                                                    <div class="h6 mb-0 text-primary">@torneo.Posicion°</div>
+                                                    <small class="text-muted">Posición</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-4">
+                                                <div class="stat-box">
+                                                    <div class="h6 mb-0 text-info">@torneo.Puntos</div>
+                                                    <small class="text-muted">Puntos</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Próximo Partido -->
+                                        @if (!string.IsNullOrEmpty(torneo.ProximoPartido))
+                                        {
+                                            <div class="alert alert-info py-2 mb-3">
+                                                <small>
+                                                    <i class="oi oi-clock me-1"></i>
+                                                    <strong>Próximo:</strong> @torneo.ProximoPartido
+                                                </small>
+                                            </div>
+                                        }
+
+                                        <!-- Información Adicional -->
+                                        <div class="mb-3">
+                                            <small class="text-muted d-block">
+                                                <i class="oi oi-people me-1"></i>
+                                                @torneo.TotalEquipos equipos participantes
+                                            </small>
+                                            @if (!string.IsNullOrEmpty(torneo.Descripcion))
+                                            {
+                                                <small class="text-muted d-block mt-1" title="@torneo.Descripcion">
+                                                    <i class="oi oi-info me-1"></i>
+                                                    @(torneo.Descripcion.Length > 50 ? torneo.Descripcion.Substring(0, 50) + "..." : torneo.Descripcion)
+                                                </small>
+                                            }
+                                        </div>
+
+                                        <!-- Equipos Disponibles -->
+                                        @if (equiposPorLiga.ContainsKey(torneo.IdLiga) && equiposPorLiga[torneo.IdLiga].Any())
+                                        {
+                                            <div class="mb-3">
+                                                <small class="text-primary fw-semibold d-block mb-2">
+                                                    <i class="oi oi-list me-1"></i>
+                                                    Equipos Disponibles (@equiposPorLiga[torneo.IdLiga].Count):
+                                                </small>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    @foreach (var equipo in equiposPorLiga[torneo.IdLiga].Take(4))
+                                                    {
+                                                        <span class="badge bg-light text-dark border" title="@equipo.Nombre">
+                                                            @(equipo.Nombre.Length > 12 ? equipo.Nombre.Substring(0, 12) + "..." : equipo.Nombre)
+                                                        </span>
+                                                    }
+                                                    @if (equiposPorLiga[torneo.IdLiga].Count > 4)
+                                                    {
+                                                        <span class="badge bg-secondary">
+                                                            +@(equiposPorLiga[torneo.IdLiga].Count - 4) más
+                                                        </span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                        else if (equiposPorLiga.ContainsKey(torneo.IdLiga))
+                                        {
+                                            <div class="mb-3">
+                                                <small class="text-muted">
+                                                    <i class="oi oi-info me-1"></i>
+                                                    No hay equipos disponibles para este torneo
+                                                </small>
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <div class="card-footer bg-transparent border-0 pt-0">
+                                        <div class="d-grid gap-2">
+                                            <button class="btn btn-primary btn-sm" @onclick="() => VerDetalleTorneo(torneo.IdLiga)">
+                                                <i class="oi oi-eye me-1"></i>Ver Detalle Completo
+                                            </button>
+                                            
+                                            @* Acciones específicas para organizadores de torneos pendientes *@
+                                            @if (torneo.Estado == "pendiente" && torneo.MiRolEnTorneo == "admin_liga")
+                                            {
+                                                <button class="btn btn-outline-warning btn-sm" @onclick="() => GestionarEquipos(torneo.IdLiga)">
+                                                    <i class="oi oi-people me-1"></i>Gestionar Equipos
+                                                </button>
+                                                <button class="btn btn-success btn-sm" @onclick="() => IniciarTorneo(torneo.IdLiga)">
+                                                    <i class="oi oi-media-play me-1"></i>Iniciar Torneo
+                                                </button>
+                                            }
+                                            
+                                            @* Acciones para torneos activos *@
+                                            @if (torneo.Estado == "activo")
+                                            {
+                                                <button class="btn btn-outline-success btn-sm" @onclick="() => VerCalendario(torneo.IdLiga)">
+                                                    <i class="oi oi-calendar me-1"></i>Ver Calendario
+                                                </button>
+                                                
+                                                @* Opciones adicionales para organizadores de torneos activos *@
+                                                @if (torneo.MiRolEnTorneo == "admin_liga")
+                                                {
+                                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => AdministrarTorneo(torneo.IdLiga)">
+                                                        <i class="oi oi-cog me-1"></i>Administrar
+                                                    </button>
+                                                }
+                                            }
+                                            
+                                            @* Acciones para torneos finalizados *@
+                                            @if (torneo.Estado == "finalizado")
+                                            {
+                                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => VerEstadisticas(torneo.IdLiga)">
+                                                    <i class="oi oi-graph me-1"></i>Ver Estadísticas
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-5">
+                        <i class="oi oi-trophy display-1 text-muted mb-4"></i>
+                        <h4 class="text-muted">@GetMensajeVacio()</h4>
+                        <p class="text-muted">@GetDescripcionVacia()</p>
+                        @if (filtroSeleccionado != "todos")
+                        {
+                            <button class="btn btn-outline-primary" @onclick="@(() => CambiarFiltro("todos"))">
+                                <i class="oi oi-list me-1"></i>Ver Todos los Torneos
+                            </button>
+                        }
+                    </div>
+                }
+                </div>
+            </div>
+        </div>
+    </div>
+</AuthGuard>
+
+<style>
+    .tournament-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border-left: 4px solid #dee2e6;
+    }
+
+    .tournament-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .tournament-card.active {
+        border-left-color: #28a745;
+    }
+
+    .tournament-card.finished {
+        border-left-color: #6c757d;
+    }
+
+    .tournament-card.upcoming {
+        border-left-color: #ffc107;
+    }
+
+    .team-avatar {
+        font-family: 'Segoe UI', sans-serif;
+    }
+
+    .stat-box {
+        padding: 0.25rem;
+    }
+
+    .btn-check:checked + .btn {
+        font-weight: 600;
+    }
+
+    .card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+
+    /* Members Container Styles */
+    .members-container {
+        min-height: 100vh;
+        background: #f8f9fa;
+    }
+
+    .members-content {
+        padding: 2rem 0;
+    }
+</style>
+
+@code {
+    // Estado de carga
+    private bool cargandoTorneos = true;
+    
+    // Datos
+    private List<TorneoParticipacion>? torneosOriginales;
+    private List<TorneoParticipacion>? torneosFiltrados;
+    
+    // Equipos por liga
+    private Dictionary<int, List<Equipo>> equiposPorLiga = new();
+    
+    // Filtros
+    private string filtroSeleccionado = "todos";
+    private int conteoActivos = 0;
+    private int conteoFinalizados = 0;
+    private int conteoProximos = 0;
+    
+    // Control
+    private DateTime ultimaActualizacion = DateTime.Now;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarTorneos();
+    }
+
+    private async Task CargarTorneos()
+    {
+        cargandoTorneos = true;
+        StateHasChanged();
+
+        try
+        {
+            Console.WriteLine("DEBUG: Cargando torneos donde participo...");
+            torneosOriginales = await LigaService.GetMisTorneosParticipandoAsync();
+            Console.WriteLine($"DEBUG: Torneos cargados: {torneosOriginales?.Count ?? -1}");
+            
+            // Cargar equipos para cada torneo
+            await CargarEquiposPorTorneo();
+            
+            CalcularConteos();
+            AplicarFiltro();
+            ultimaActualizacion = DateTime.Now;
+            
+            ToastService.ShowSuccess($"Se cargaron {torneosOriginales?.Count ?? 0} torneos");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"DEBUG: Error al cargar torneos: {ex.Message}");
+            ToastService.ShowError("Error al cargar torneos: " + ex.Message);
+            torneosOriginales = new List<TorneoParticipacion>();
+            torneosFiltrados = new List<TorneoParticipacion>();
+        }
+        finally
+        {
+            cargandoTorneos = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CalcularConteos()
+    {
+        if (torneosOriginales == null) return;
+        
+        conteoActivos = torneosOriginales.Count(t => t.Estado == "activo");
+        conteoFinalizados = torneosOriginales.Count(t => t.Estado == "finalizado");
+        conteoProximos = torneosOriginales.Count(t => t.Estado == "proximo");
+    }
+
+    private void CambiarFiltro(string nuevoFiltro)
+    {
+        filtroSeleccionado = nuevoFiltro;
+        AplicarFiltro();
+        StateHasChanged();
+    }
+
+    private void AplicarFiltro()
+    {
+        if (torneosOriginales == null)
+        {
+            torneosFiltrados = new List<TorneoParticipacion>();
+            return;
+        }
+
+        torneosFiltrados = filtroSeleccionado switch
+        {
+            "activos" => torneosOriginales.Where(t => t.Estado == "activo").ToList(),
+            "finalizados" => torneosOriginales.Where(t => t.Estado == "finalizado").ToList(),
+            "proximos" => torneosOriginales.Where(t => t.Estado == "proximo").ToList(),
+            _ => torneosOriginales.ToList()
+        };
+    }
+
+    private async Task CargarEquiposPorTorneo()
+    {
+        if (torneosOriginales == null) return;
+
+        equiposPorLiga.Clear();
+        
+        foreach (var torneo in torneosOriginales)
+        {
+            try
+            {
+                Console.WriteLine($"DEBUG: Cargando equipos para liga {torneo.IdLiga}");
+                var equipos = await EquipoService.GetEquiposPorLigaAsync(torneo.IdLiga);
+                if (equipos != null)
+                {
+                    equiposPorLiga[torneo.IdLiga] = equipos;
+                    Console.WriteLine($"DEBUG: Equipos cargados para liga {torneo.IdLiga}: {equipos.Count}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"DEBUG: Error cargando equipos para liga {torneo.IdLiga}: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task RefreshTorneos()
+    {
+        await CargarTorneos();
+    }
+
+    private void VerDetalleTorneo(int idTorneo)
+    {
+        // TODO: Implementar página de detalle para jugadores (no gestión)
+        // Navigation.NavigateTo($"/members/tournament-detail/{idTorneo}");
+        ToastService.ShowInfo("Funcionalidad en desarrollo. Ver detalle completo estará disponible pronto.");
+    }
+
+    private void VerCalendario(int idTorneo)
+    {
+        Navigation.NavigateTo($"/members/tournament-calendar/{idTorneo}");
+    }
+
+    private void BackToHome()
+    {
+        Navigation.NavigateTo("/members/dashboard");
+    }
+
+    // Métodos para gestión de torneos
+    private void GestionarEquipos(int idTorneo)
+    {
+        Navigation.NavigateTo($"/members/tournament-teams/{idTorneo}");
+    }
+
+    private async Task IniciarTorneo(int idTorneo)
+    {
+        try
+        {
+            var confirmacion = await JSRuntime.InvokeAsync<bool>("confirm", 
+                "¿Estás seguro de que quieres iniciar este torneo? Una vez iniciado, no podrás modificar los equipos.");
+            
+            if (confirmacion)
+            {
+                await LigaService.IniciarTorneoAsync(idTorneo);
+                ToastService.ShowSuccess("Torneo iniciado correctamente");
+                await CargarTorneos(); // Recargar para mostrar cambios
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("Error al iniciar torneo: " + ex.Message);
+        }
+    }
+
+    private void AdministrarTorneo(int idTorneo)
+    {
+        Navigation.NavigateTo($"/members/tournament-admin/{idTorneo}");
+    }
+
+    private void VerEstadisticas(int idTorneo)
+    {
+        Navigation.NavigateTo($"/members/tournament-stats/{idTorneo}");
+    }
+
+    // Métodos de estilo
+    private string GetCardClass(string estado) => estado switch
+    {
+        "activo" => "active",
+        "finalizado" => "finished",
+        "proximo" => "upcoming",
+        _ => ""
+    };
+
+    private string GetBadgeClass(string estado) => estado switch
+    {
+        "activo" => "bg-success",
+        "finalizado" => "bg-secondary",
+        "proximo" => "bg-warning text-dark",
+        _ => "bg-primary"
+    };
+
+    private string GetEstadoTexto(string estado) => estado switch
+    {
+        "activo" => "En Curso",
+        "finalizado" => "Finalizado",
+        "proximo" => "Próximo",
+        _ => "Desconocido"
+    };
+
+    private string GetMensajeVacio() => filtroSeleccionado switch
+    {
+        "activos" => "No hay torneos activos",
+        "finalizados" => "No hay torneos finalizados",
+        "proximos" => "No hay torneos próximos",
+        _ => "No participas en ningún torneo"
+    };
+
+    private string GetDescripcionVacia() => filtroSeleccionado switch
+    {
+        "activos" => "No tienes torneos en curso en este momento.",
+        "finalizados" => "No has participado en torneos finalizados.",
+        "proximos" => "No tienes torneos programados próximamente.",
+        _ => "Acepta invitaciones a ligas para comenzar a participar en torneos."
+    };
+}

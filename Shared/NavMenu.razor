@@ -18,17 +18,34 @@
         
         @if (isAuthenticated)
         {
-            <!-- Panel Inicio (solo para usuarios autenticados) -->
+            <!-- Panel Inicio (solo para administradores) -->
+            @if (userRole == "super_admin" || userRole == "admin")
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="members/home">
+                        <span class="oi oi-target" aria-hidden="true"></span> Panel Inicio
+                    </NavLink>
+                </div>
+                
+                <!-- Dashboard -->
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="members/dashboard">
+                        <span class="oi oi-dashboard" aria-hidden="true"></span> Dashboard
+                    </NavLink>
+                </div>
+            }
+            
+            <!-- Mis Torneos -->
             <div class="nav-item px-3">
-                <NavLink class="nav-link" href="members/home">
-                    <span class="oi oi-target" aria-hidden="true"></span> Panel Inicio
+                <NavLink class="nav-link" href="members/my-tournaments-playing">
+                    <span class="oi oi-badge" aria-hidden="true"></span> Mis Torneos
                 </NavLink>
             </div>
             
-            <!-- Dashboard -->
+            <!-- Mis Invitaciones -->
             <div class="nav-item px-3">
-                <NavLink class="nav-link" href="members/dashboard">
-                    <span class="oi oi-dashboard" aria-hidden="true"></span> Dashboard
+                <NavLink class="nav-link" href="members/my-invitations">
+                    <span class="oi oi-envelope-closed" aria-hidden="true"></span> Mis Invitaciones
                 </NavLink>
             </div>
             
@@ -38,6 +55,13 @@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="members/usuarios">
                         <span class="oi oi-people" aria-hidden="true"></span> Usuarios
+                    </NavLink>
+                </div>
+                
+                <!-- Test Equipos (Debug) - solo para administradores -->
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="test-equipos">
+                        <span class="oi oi-bug" aria-hidden="true"></span> Test Equipos (Debug)
                     </NavLink>
                 </div>
             }
@@ -76,6 +100,8 @@
 @using FootballerWeb.Services
 @* @inject IAuthStateService AuthStateService *@
 @inject IJSRuntime JSRuntime
+@inject IJwtClientService JwtClientService
+@inject UsuarioService UsuarioService
 
 @code {
     private bool collapseNavMenu = true;
@@ -97,30 +123,51 @@
         try
         {
             var token = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "authToken");
-            isAuthenticated = !string.IsNullOrEmpty(token);
+            isAuthenticated = !string.IsNullOrEmpty(token) && JwtClientService.IsTokenValid(token);
             
-            if (isAuthenticated)
+            if (isAuthenticated && !string.IsNullOrEmpty(token))
             {
-                // Obtener el rol del token JWT
-                var userInfo = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "userInfo");
-                if (!string.IsNullOrEmpty(userInfo))
+                // Primero intentar obtener el rol del JWT
+                var claims = JwtClientService.GetClaimsFromToken(token);
+                userRole = claims?.FindFirst("role")?.Value ?? 
+                          claims?.FindFirst("rol")?.Value ?? 
+                          claims?.FindFirst("Rol")?.Value;
+                
+                // Si no hay rol en el JWT, obtenerlo de la base de datos
+                if (string.IsNullOrEmpty(userRole))
                 {
-                    try
+                    var userEmail = JwtClientService.GetUserEmailFromToken(token);
+                    if (!string.IsNullOrEmpty(userEmail))
                     {
-                        var user = System.Text.Json.JsonSerializer.Deserialize<dynamic>(userInfo);
-                        userRole = user?.GetProperty("rol").GetString();
-                    }
-                    catch
-                    {
-                        userRole = null;
+                        try
+                        {
+                            var roleFromDb = await UsuarioService.GetUserRoleByEmailAsync(userEmail);
+                            if (!string.IsNullOrEmpty(roleFromDb))
+                            {
+                                userRole = roleFromDb;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[ERROR NavMenu] Error obteniendo rol de BD: {ex.Message}");
+                        }
                     }
                 }
+                
+                // Debug: Log para ver qué rol se está detectando
+                Console.WriteLine($"[DEBUG NavMenu] Rol detectado: '{userRole}'");
+                Console.WriteLine($"[DEBUG NavMenu] Es admin?: {(userRole == "super_admin" || userRole == "admin")}");
+            }
+            else
+            {
+                userRole = null;
             }
             
             StateHasChanged();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Console.WriteLine($"[ERROR NavMenu] Error en CheckAuthenticationStatus: {ex.Message}");
             isAuthenticated = false;
             userRole = null;
             StateHasChanged();

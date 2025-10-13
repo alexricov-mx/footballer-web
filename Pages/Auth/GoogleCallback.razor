@@ -101,9 +101,9 @@
                     isProcessing = false;
                     StateHasChanged();
                     
-                    // Redirect to home member after 2 seconds
+                    // Redirect to my tournaments after 2 seconds
                     await Task.Delay(2000);
-                    Navigation.NavigateTo("/members/home");
+                    Navigation.NavigateTo("/members/my-tournaments-playing");
                 }
                 else
                 {
